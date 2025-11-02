@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
@@ -14,8 +15,8 @@ use Illuminate\Support\Facades\RateLimiter;
 
 class AuthController extends Controller
 {
-    protected $maxAttempts = 5;
-    protected $decaySeconds = 60 * 5; // 5 minutes
+    protected int $maxAttempts = 5;
+    protected int $decaySeconds = 60 * 5; // 5 minutes
 
     // show login form
     public function showLoginForm()
@@ -50,18 +51,19 @@ class AuthController extends Controller
                 // set user online (optional)
                 $user = Auth::user();
                 if ($user) {
-                    // if you want to set online status on login, uncomment:
+                    // jika ingin otomatis set online pada login, aktifkan:
                     $user->status = 'online';
-                    $user->saveQuietly(); // avoid firing events if unwanted
+                    $user->saveQuietly();
                 }
 
+                // return redirect response (NOT string)
                 return $this->redirectToRole($user);
             }
 
             // failed attempt
             RateLimiter::hit($throttleKey, $this->decaySeconds);
 
-            $remaining = $this->maxAttempts - RateLimiter::attempts($throttleKey);
+            $remaining = max(0, $this->maxAttempts - RateLimiter::attempts($throttleKey));
             $message = 'Email atau password salah.';
             if ($remaining > 0) $message .= " Sisa percobaan: {$remaining}.";
 
@@ -78,7 +80,7 @@ class AuthController extends Controller
         return view('auth.register');
     }
 
-    // handle registration (optional, disable in prod if not wanted)
+    // handle registration (optional)
     public function register(Request $request)
     {
         $data = $request->validate([
@@ -94,8 +96,8 @@ class AuthController extends Controller
                 'name' => $data['name'],
                 'email' => $data['email'],
                 'phone' => $data['phone'] ?? null,
-                'password' => $data['password'], // rely on model mutator to hash
-                'role' => 'staff', // default role, adjust as needed
+                'password' => $data['password'], // model mutator should hash
+                'role' => 'staff', // default role
                 'join_date' => now()->toDateString(),
                 'monthly_work_limit' => 200,
                 'used_hours' => 0,
@@ -123,7 +125,7 @@ class AuthController extends Controller
         try {
             $user = Auth::user();
             if ($user) {
-                // set offline on logout (recommended for driver/guide)
+                // set offline on logout (recommended)
                 $user->status = 'offline';
                 $user->saveQuietly();
             }
@@ -135,7 +137,7 @@ class AuthController extends Controller
             return redirect()->route('login')->with('success','Kamu berhasil logout.');
         } catch (\Throwable $e) {
             Log::error('AuthController.logout error: '.$e->getMessage(), ['user_id'=>optional(Auth::user())->id, 'trace'=>$e->getTraceAsString()]);
-            // Even on error, force logout client-side
+            // Force clear client session even on error
             try {
                 Auth::logout();
                 $request->session()->invalidate();
@@ -147,21 +149,28 @@ class AuthController extends Controller
         }
     }
 
-    // helper: redirect based on role
-    protected function redirectToRole(User $user)
+    /**
+     * Helper: redirect based on role and return RedirectResponse (do NOT return plain string).
+     */
+    protected function redirectToRole(?User $user): RedirectResponse
     {
-        // customize per role routes
-        if (!$user) {
+        // If no user given, fallback to dashboard
+        if (! $user) {
+            return redirect()->route('dashboard');
+        }
+
+        // Customize per role
+        if ($user->role === 'super_admin' || $user->role === 'admin' || $user->role === 'staff') {
             return redirect()->intended(route('dashboard'));
         }
 
-        return match($user->role) {
-            'super_admin' => redirect()->intended(route('dashboard'))->getTargetUrl(),
-            'admin' => redirect()->intended(route('dashboard'))->getTargetUrl(),
-            'staff' => redirect()->intended(route('dashboard'))->getTargetUrl(),
-            'driver', 'guide' => redirect()->intended(route('assignments.my'))->getTargetUrl(),
-            default => redirect()->intended(route('dashboard'))->getTargetUrl(),
-        };
+        if (in_array($user->role, ['driver','guide'])) {
+            // driver/guide land on their assignments page
+            return redirect()->intended(route('assignments.my'));
+        }
+
+        // default
+        return redirect()->intended(route('dashboard'));
     }
 
     /**

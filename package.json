@@ -4,6 +4,7 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
+        "all": "concurrently \"vite\" \"php artisan serve --port=8120\"",
         "dev": "vite"
     },
     "devDependencies": {

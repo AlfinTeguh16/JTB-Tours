@@ -81,8 +81,8 @@
             <td class="px-4 py-3 text-sm text-right">
               {{-- tombol buka modal detail --}}
               <button
-                onclick="openAssignmentModal(@json([
-                  'id'=>$a->id,
+                onclick="openAssignmentModal({{ json_encode([
+                  'id' => $a->id,
                   'order' => [
                     'customer' => $a->order->customer_name ?? '-',
                     'pickup' => $a->order->pickup_time ? \Carbon\Carbon::parse($a->order->pickup_time)->format('d M Y H:i') : '-',
@@ -94,7 +94,7 @@
                   'guide' => $a->guide?->only(['id','name','phone']),
                   'status' => $a->status,
                   'note' => $a->note,
-                ]) )"
+                ]) }})"
                 class="px-2 py-1 bg-indigo-600 text-white rounded text-xs">Detail</button>
 
               <form action="{{ route('assignments.destroy', $a) }}" method="POST" class="inline-block" onsubmit="return confirm('Hapus assignment?')">
@@ -170,6 +170,11 @@
 
 @push('scripts')
 <script>
+  function openAssignmentModal(payload) {
+    const event = new CustomEvent('open-assignment-modal', { detail: payload });
+    window.dispatchEvent(event);
+  }
+
   function assignmentModal() {
     return {
       open: false,
@@ -195,7 +200,7 @@
       },
       changeStatusUrl(status) {
         // returns url like /assignments/{id}/status
-        return '/assignments/' + this.payload.id + '/status';
+        return `/assignments/${this.payload.id}/status`;
       },
       submitForm(form) {
         // simple confirmation

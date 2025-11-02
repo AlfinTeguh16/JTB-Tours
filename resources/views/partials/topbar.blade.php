@@ -1,4 +1,4 @@
-@include('availability.toggle')
+
 
 <nav class="bg-white border-b">
     <div class="max-w-6xl mx-auto px-4">

@@ -27,17 +27,10 @@
         <input type="password" name="password" required class="w-full border p-2 rounded mb-3">
         @error('password') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
   
-        <div class="flex items-center justify-between mb-4">
-          <label class="inline-flex items-center">
-            <input type="checkbox" name="remember" class="form-checkbox"> <span class="ml-2 text-sm">Remember me</span>
-          </label>
-          <a href="#" class="text-sm text-blue-600">Lupa password?</a>
-        </div>
   
         <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded">Login</button>
       </form>
   
-      <p class="text-sm text-center mt-4">Belum punya akun? <a href="{{ route('register') }}" class="text-blue-600">Daftar</a></p>
     </div>
   </div>
   
