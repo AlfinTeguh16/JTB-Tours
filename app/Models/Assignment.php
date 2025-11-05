@@ -13,6 +13,8 @@ class Assignment extends Model
         'guide_id',
         'assigned_by',
         'status',
+        'workstart',
+        'workend',
         'assigned_at',
     ];
 

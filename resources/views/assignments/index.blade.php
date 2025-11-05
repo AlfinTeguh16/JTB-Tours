@@ -55,6 +55,32 @@
       </thead>
       <tbody class="divide-y divide-gray-100">
         @forelse($assignments as $a)
+          {{-- prepare payload safely for JS --}}
+          @php
+            $modalPayload = [
+              'id' => $a->id,
+              'order' => [
+                'customer' => $a->order->customer_name ?? '-',
+                'pickup' => $a->order->pickup_time ? \Carbon\Carbon::parse($a->order->pickup_time)->format('d M Y H:i') : '-',
+                'from' => $a->order->pickup_location ?? '-',
+                'to' => $a->order->destination ?? '-',
+                'product' => $a->order->product?->name ?? '-'
+              ],
+              'driver' => $a->driver ? [
+                'id' => $a->driver->id,
+                'name' => $a->driver->name,
+                'phone' => $a->driver->phone ?? null,
+              ] : null,
+              'guide' => $a->guide ? [
+                'id' => $a->guide->id,
+                'name' => $a->guide->name,
+                'phone' => $a->guide->phone ?? null,
+              ] : null,
+              'status' => $a->status,
+              'note' => $a->note,
+            ];
+          @endphp
+
           <tr>
             <td class="px-4 py-3 text-sm">{{ $a->id }}</td>
             <td class="px-4 py-3 text-sm">
@@ -68,6 +94,7 @@
             <td class="px-4 py-3 text-sm">{{ $a->assigned_at ? \Carbon\Carbon::parse($a->assigned_at)->format('d M Y H:i') : '-' }}</td>
             <td class="px-4 py-3 text-sm">
               @php
+                // safe badge mapping
                 $badge = match($a->status) {
                   'pending' => 'bg-yellow-100 text-yellow-800',
                   'accepted' => 'bg-green-100 text-green-800',
@@ -76,25 +103,12 @@
                   default => 'bg-gray-100 text-gray-800'
                 };
               @endphp
-              <span class="px-2 py-1 rounded text-xs {{ $badge }}">{{ ucfirst($a->status) }}</span>
+              <span class="px-2 py-1 rounded text-xs {{ $badge }}">{{ ucfirst($a->status ?? '—') }}</span>
             </td>
             <td class="px-4 py-3 text-sm text-right">
               {{-- tombol buka modal detail --}}
               <button
-                onclick="openAssignmentModal({{ json_encode([
-                  'id' => $a->id,
-                  'order' => [
-                    'customer' => $a->order->customer_name ?? '-',
-                    'pickup' => $a->order->pickup_time ? \Carbon\Carbon::parse($a->order->pickup_time)->format('d M Y H:i') : '-',
-                    'from' => $a->order->pickup_location ?? '-',
-                    'to' => $a->order->destination ?? '-',
-                    'product' => $a->order->product?->name ?? '-'
-                  ],
-                  'driver' => $a->driver?->only(['id','name','phone']),
-                  'guide' => $a->guide?->only(['id','name','phone']),
-                  'status' => $a->status,
-                  'note' => $a->note,
-                ]) }})"
+                onclick='openAssignmentModal(@json($modalPayload))'
                 class="px-2 py-1 bg-indigo-600 text-white rounded text-xs">Detail</button>
 
               <form action="{{ route('assignments.destroy', $a) }}" method="POST" class="inline-block" onsubmit="return confirm('Hapus assignment?')">
@@ -134,7 +148,7 @@
       <div><strong>Driver:</strong> <span x-text="payload.driver?.name ?? '-'"></span> (<span x-text="payload.driver?.id ?? '-'"></span>)</div>
       <div><strong>Guide:</strong> <span x-text="payload.guide?.name ?? '-'"></span> (<span x-text="payload.guide?.id ?? '-'"></span>)</div>
       <div><strong>Note:</strong> <span x-text="payload.note ?? '-'"></span></div>
-      <div><strong>Status:</strong> <span x-text="payload.status"></span></div>
+      <div><strong>Status:</strong> <span x-text="payload.status ?? '-'"></span></div>
     </div>
 
     <div class="mt-4 flex items-center justify-end space-x-2">

@@ -43,6 +43,22 @@
 
       <tbody class="divide-y divide-gray-100">
         @forelse($vehicles as $v)
+          @php
+            // prepare safe JSON payload for onclick
+            $payload = [
+              'id' => $v->id,
+              'brand' => $v->brand,
+              'type' => $v->type,
+              'plate' => $v->plate_number,
+              'color' => $v->color,
+              'capacity' => $v->capacity,
+              'year' => $v->year,
+              'status' => $v->status,
+            ];
+            // encode and escape quotes so it can be printed raw inside onclick attribute
+            $payloadJson = htmlspecialchars(json_encode($payload, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
+          @endphp
+
           <tr>
             <td class="px-4 py-3 text-sm">{{ $v->id }}</td>
             <td class="px-4 py-3 text-sm">
@@ -57,7 +73,8 @@
               </span>
             </td>
             <td class="px-4 py-3 text-sm text-right">
-              <button onclick="openVehicleModal(@json(['id'=>$v->id,'brand'=>$v->brand,'type'=>$v->type,'plate'=>$v->plate_number,'color'=>$v->color,'capacity'=>$v->capacity,'year'=>$v->year,'status'=>$v->status]))" class="px-2 py-1 bg-indigo-600 text-white rounded text-xs">Detail</button>
+              {{-- Use raw (already escaped) JSON to call JS function safely --}}
+              <button onclick="openVehicleModal({!! $payloadJson !!})" class="px-2 py-1 bg-indigo-600 text-white rounded text-xs">Detail</button>
 
               <a href="{{ route('vehicles.edit', $v) }}" class="px-2 py-1 ml-1 bg-yellow-400 text-white rounded text-xs">Edit</a>
 

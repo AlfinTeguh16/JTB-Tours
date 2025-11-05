@@ -30,7 +30,14 @@ class WorkScheduleController extends Controller
             ->get()
             ->keyBy('user_id');
 
-        return view('work_schedules.index', compact('users','schedules','month','year'));
+        $perPage = 15; // ganti sesuai kebutuhan
+        $workSchedules = WorkSchedule::query()
+            ->orderBy('year', 'desc')
+            ->orderBy('month', 'desc')
+            ->paginate($perPage);
+        
+
+        return view('work_schedules.index', compact('users','schedules','month','year', 'workSchedules'));
     }
 
     /**

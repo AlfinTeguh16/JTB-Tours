@@ -11,50 +11,53 @@ use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
-    /**
-     * Show dashboard with role-aware stats and charts.
-     */
     public function index(Request $request)
     {
         try {
             $user = Auth::user();
             $now = Carbon::now();
 
-            // month/year filter (optional via query)
+            // Filter tahun & bulan dari query
             $year = (int) $request->query('year', $now->year);
             $month = (int) $request->query('month', $now->month);
 
             $startOfMonth = Carbon::create($year, $month, 1)->startOfMonth()->toDateTimeString();
-            $endOfMonth = Carbon::create($year, $month, 1)->endOfMonth()->toDateTimeString();
+            $endOfMonth   = Carbon::create($year, $month, 1)->endOfMonth()->toDateTimeString();
 
-            // Safe helpers: check models/tables exist before using
-            $ordersTableExists = Schema::hasTable('orders');
-            $usersTableExists = Schema::hasTable('users');
-            $productsTableExists = Schema::hasTable('products');
+            // Cek tabel yang tersedia
+            $ordersTableExists        = Schema::hasTable('orders');
+            $assignmentsTableExists   = Schema::hasTable('assignments');
+            $usersTableExists         = Schema::hasTable('users');
+            $productsTableExists      = Schema::hasTable('products');
             $workSchedulesTableExists = Schema::hasTable('work_schedules');
 
-            // Basic counts (defaults 0)
+            // Default stats
             $ordersThisMonth = 0;
             $assignedThisMonth = 0;
             $completedThisMonth = 0;
             $activeDrivers = 0;
 
+            // Hitung data order bulan ini
             if ($ordersTableExists) {
                 $ordersThisMonth = (int) DB::table('orders')
                     ->whereBetween('pickup_time', [$startOfMonth, $endOfMonth])
                     ->count();
+            }
 
-                $assignedThisMonth = (int) DB::table('orders')
-                    ->whereBetween('pickup_time', [$startOfMonth, $endOfMonth])
-                    ->where('status', 'assigned')
+            // Assignment bulan ini
+            if ($assignmentsTableExists) {
+                $assignedThisMonth = (int) DB::table('assignments')
+                    ->whereBetween('assigned_at', [$startOfMonth, $endOfMonth])
+                    ->where('status', 'accepted')
                     ->count();
 
-                $completedThisMonth = (int) DB::table('orders')
-                    ->whereBetween('pickup_time', [$startOfMonth, $endOfMonth])
+                $completedThisMonth = (int) DB::table('assignments')
+                    ->whereBetween('assigned_at', [$startOfMonth, $endOfMonth])
                     ->where('status', 'completed')
                     ->count();
             }
 
+            // Driver/guide aktif
             if ($usersTableExists) {
                 $activeDrivers = (int) DB::table('users')
                     ->whereIn('role', ['driver', 'guide'])
@@ -62,43 +65,41 @@ class DashboardController extends Controller
                     ->count();
             }
 
-            // monthly orders for last 12 months for chart
+            // Data untuk chart order 12 bulan terakhir
             $monthlyOrders = [];
-            for ($i = 11; $i >= 0; $i--) {
-                $dt = $now->copy()->subMonths($i);
-                $start = $dt->copy()->startOfMonth()->toDateTimeString();
-                $end = $dt->copy()->endOfMonth()->toDateTimeString();
+            if ($ordersTableExists) {
+                for ($i = 11; $i >= 0; $i--) {
+                    $dt = $now->copy()->subMonths($i);
+                    $start = $dt->copy()->startOfMonth()->toDateTimeString();
+                    $end = $dt->copy()->endOfMonth()->toDateTimeString();
 
-                $count = 0;
-                if ($ordersTableExists) {
-                    $count = (int) DB::table('orders')->whereBetween('pickup_time', [$start, $end])->count();
+                    $count = (int) DB::table('orders')
+                        ->whereBetween('pickup_time', [$start, $end])
+                        ->count();
+
+                    $monthlyOrders[] = [
+                        'label' => $dt->format('M Y'),
+                        'count' => $count,
+                        'year' => $dt->year,
+                        'month' => $dt->month,
+                    ];
                 }
-
-                $monthlyOrders[] = [
-                    'label' => $dt->format('M Y'),
-                    'count' => $count,
-                    'year' => $dt->year,
-                    'month' => $dt->month,
-                ];
             }
 
-            // product distribution (pie) for the selected month
+            // Distribusi produk (pie chart)
             $productDistribution = [];
             if ($ordersTableExists) {
                 $rows = DB::table('orders')
-                    ->select('product_id', DB::raw('count(*) as total'))
+                    ->select('product_id', DB::raw('COUNT(*) as total'))
                     ->whereBetween('pickup_time', [$startOfMonth, $endOfMonth])
                     ->groupBy('product_id')
                     ->get();
 
                 foreach ($rows as $r) {
-                    $label = $r->product_id ? ("Product #{$r->product_id}") : 'Unknown';
-                    // try to fetch product name if possible
+                    $label = 'Unknown Product';
                     if ($productsTableExists && $r->product_id) {
                         $prod = DB::table('products')->where('id', $r->product_id)->first();
-                        if ($prod && isset($prod->name)) {
-                            $label = $prod->name;
-                        }
+                        if ($prod && isset($prod->name)) $label = $prod->name;
                     }
                     $productDistribution[] = [
                         'product_id' => $r->product_id,
@@ -108,15 +109,14 @@ class DashboardController extends Controller
                 }
             }
 
-            // If user is driver/guide: personal stats (assignment count & work schedule)
-            $personal = [
-                'assignments_count' => null,
-                'work_schedule' => null,
-            ];
-
-            if ($user && Schema::hasTable('assignments')) {
-                $personal['assignments_count'] = (int) DB::table('assignments')
-                    ->where('user_id', $user->id)
+            // Statistik pribadi driver/guide
+            $personal = ['assignments_count' => null, 'work_schedule' => null];
+            if ($assignmentsTableExists && $user) {
+                $personal['assignments_count'] = DB::table('assignments')
+                    ->where(function ($q) use ($user) {
+                        $q->where('driver_id', $user->id)
+                          ->orWhere('guide_id', $user->id);
+                    })
                     ->count();
             }
 
@@ -132,20 +132,10 @@ class DashboardController extends Controller
                         'total_hours' => $ws->total_hours ?? 0,
                         'used_hours' => $ws->used_hours ?? 0,
                     ];
-                } else {
-                    if ($usersTableExists) {
-                        $u = DB::table('users')->where('id', $user->id)->first();
-                        if ($u) {
-                            $personal['work_schedule'] = [
-                                'total_hours' => $u->monthly_work_limit ?? 0,
-                                'used_hours' => $u->used_hours ?? 0,
-                            ];
-                        }
-                    }
                 }
             }
 
-            // top drivers by used_hours for the month (if work_schedules exists)
+            // Top driver / guide berdasarkan jam kerja
             $topDrivers = [];
             if ($workSchedulesTableExists) {
                 $rows = DB::table('work_schedules')
@@ -170,7 +160,17 @@ class DashboardController extends Controller
                 }
             }
 
-            // package up data for view
+            // Tahun tersedia untuk dropdown filter
+            $availableYears = [];
+            if ($ordersTableExists) {
+                $availableYears = DB::table('orders')
+                    ->select(DB::raw('DISTINCT YEAR(pickup_time) as year'))
+                    ->orderByDesc('year')
+                    ->pluck('year')
+                    ->toArray();
+            }
+
+            // Siapkan data ke view
             $data = [
                 'ordersThisMonth' => $ordersThisMonth,
                 'assignedThisMonth' => $assignedThisMonth,
@@ -182,15 +182,29 @@ class DashboardController extends Controller
                 'topDrivers' => $topDrivers,
                 'month' => $month,
                 'year' => $year,
+                'availableYears' => $availableYears,
             ];
 
-            return view('dashboard', $data);
+            // Pilih view sesuai role user
+            $role = $user->role ?? 'admin';
+            $roleViewMap = [
+                'super_admin' => 'dashboard.super-admin',
+                'admin'       => 'dashboard.admin',
+                'staff'       => 'dashboard.admin',
+                'driver'      => 'dashboard.driver-guide',
+                'guide'       => 'dashboard.driver-guide',
+            ];
+
+            $view = $roleViewMap[$role] ?? 'dashboard.admin';
+
+            return view($view, $data);
+            // return response()->json($data);
+
         } catch (\Throwable $e) {
             Log::error('DashboardController@index error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
-                'request' => $request->all(),
             ]);
-            return redirect()->back()->with('error', 'Gagal memuat dashboard.');
+            return back()->with('error', 'Gagal memuat dashboard.');
         }
     }
 }

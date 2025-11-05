@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Events\NewAssignmentCreated; // uncomment jika pakai broadcasting
+use App\Events\NewAssignmentCreated;
 use App\Models\Assignment;
 use App\Models\Order;
 use App\Models\User;
@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class AssignmentController extends Controller
 {
@@ -22,7 +23,6 @@ class AssignmentController extends Controller
         try {
             $q = Assignment::with(['order.product', 'driver', 'guide', 'assignedBy']);
 
-            // Optional filter dari query string (filter nanti di view)
             if ($request->filled('status')) {
                 $q->where('status', $request->query('status'));
             }
@@ -43,7 +43,7 @@ class AssignmentController extends Controller
 
             return view('assignments.index', compact('assignments'));
         } catch (\Throwable $e) {
-            Log::error('Assignment.index error: '.$e->getMessage(), ['trace'=>$e->getTraceAsString()]);
+            Log::error('Assignment.index error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return redirect()->back()->with('error', 'Terjadi kesalahan saat mengambil data assignment.');
         }
     }
@@ -62,7 +62,7 @@ class AssignmentController extends Controller
 
             return view('assignments.create', compact('orders', 'drivers', 'guides', 'order'));
         } catch (\Throwable $e) {
-            Log::error('Assignment.create error: '.$e->getMessage(), ['trace'=>$e->getTraceAsString()]);
+            Log::error('Assignment.create error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return redirect()->back()->with('error', 'Gagal membuka form assignment.');
         }
     }
@@ -82,7 +82,6 @@ class AssignmentController extends Controller
         DB::beginTransaction();
 
         try {
-            // Lock order row to prevent concurrent assigns
             $order = Order::lockForUpdate()->findOrFail($data['order_id']);
 
             if ($order->status === 'completed') {
@@ -91,17 +90,16 @@ class AssignmentController extends Controller
             }
 
             $driver = User::findOrFail($data['driver_id']);
-            $guide  = $data['guide_id'] ? User::find($data['guide_id']) : null;
+            $guide = $data['guide_id'] ? User::find($data['guide_id']) : null;
 
             $estHours = $this->calculateEstimatedHours($order);
-
             $month = now()->month;
-            $year  = now()->year;
+            $year = now()->year;
 
-            // Ambil atau buat work schedule untuk driver & guide
+            // Work schedule driver
             $driverSchedule = WorkSchedule::firstOrCreate(
                 ['user_id' => $driver->id, 'month' => $month, 'year' => $year],
-                ['total_hours' => $driver->monthly_work_limit ?? 200, 'used_hours' => 0]
+                ['total_hours' => $driver->monthly_work_limit ?? 200, 'used_hours' => 0.00]
             );
 
             if (($driverSchedule->used_hours + $estHours) > $driverSchedule->total_hours) {
@@ -112,7 +110,7 @@ class AssignmentController extends Controller
             if ($guide) {
                 $guideSchedule = WorkSchedule::firstOrCreate(
                     ['user_id' => $guide->id, 'month' => $month, 'year' => $year],
-                    ['total_hours' => $guide->monthly_work_limit ?? 200, 'used_hours' => 0]
+                    ['total_hours' => $guide->monthly_work_limit ?? 200, 'used_hours' => 0.00]
                 );
 
                 if (($guideSchedule->used_hours + $estHours) > $guideSchedule->total_hours) {
@@ -121,7 +119,6 @@ class AssignmentController extends Controller
                 }
             }
 
-            // Buat assignment
             $assignment = Assignment::create([
                 'order_id'     => $order->id,
                 'driver_id'    => $driver->id,
@@ -132,38 +129,103 @@ class AssignmentController extends Controller
                 'note'         => $data['note'] ?? null,
             ]);
 
-            // Update order status menjadi assigned jika perlu
             $order->update(['status' => 'assigned']);
 
             DB::commit();
 
-            // Broadcast / notifikasi (opsional)
             // event(new NewAssignmentCreated($assignment));
 
             return redirect()->route('assignments.index')->with('success', 'Assignment berhasil dibuat.');
         } catch (\Throwable $e) {
             DB::rollBack();
-            Log::error('Assignment.store error: '.$e->getMessage(), [
-                'payload' => $data,
-                'trace'   => $e->getTraceAsString(),
-            ]);
+            Log::error('Assignment.store error: ' . $e->getMessage(), ['payload' => $data, 'trace' => $e->getTraceAsString()]);
             return redirect()->back()->withInput()->with('error', 'Terjadi kesalahan saat membuat assignment.');
         }
     }
 
     /**
+     * Ubah status assignment oleh driver/guide
+     */
+    public function changeStatus(Request $request, Assignment $assignment)
+    {
+        $request->validate([
+            'status' => 'required|in:accepted,completed,declined',
+        ]);
+
+        $user = Auth::user();
+        $status = $request->status;
+
+        if (!in_array($user->role, ['driver', 'guide']) ||
+            ($assignment->driver_id !== $user->id && $assignment->guide_id !== $user->id)) {
+            abort(403, 'Anda tidak memiliki izin untuk mengubah status tugas ini.');
+        }
+
+        // Accepted → catat waktu mulai
+        if ($status === 'accepted' && !$assignment->workstart) {
+            $assignment->workstart = now();
+        }
+
+        // Completed → hitung durasi dan update jam kerja
+        if ($status === 'completed' && !$assignment->workend) {
+            $assignment->workend = now();
+
+            if ($assignment->workstart) {
+                $start = Carbon::parse($assignment->workstart);
+                $end = Carbon::parse($assignment->workend);
+                $diffMinutes = max(1, $end->diffInMinutes($start));
+
+                $month = now()->month;
+                $year = now()->year;
+                $userId = $assignment->driver_id ?? $assignment->guide_id;
+
+                $ws = WorkSchedule::firstOrCreate(
+                    ['user_id' => $userId, 'month' => $month, 'year' => $year],
+                    ['total_hours' => 200, 'used_hours' => 0.00]
+                );
+
+                $newUsed = $this->addUsedHoursHMM($ws->used_hours, $diffMinutes);
+
+                $ws->update(['used_hours' => $newUsed]);
+            }
+        }
+
+        $assignment->status = $status;
+        $assignment->save();
+
+        return back()->with('success', 'Status assignment diperbarui.');
+    }
+
+    /**
+     * Helper: tambahkan menit ke format jam H.MM (mis: 2.30, 0.45, 3.00)
+     */
+    private function addUsedHoursHMM($currentUsedHours, int $minutesToAdd): float
+    {
+        $current = sprintf('%.2f', (float)($currentUsedHours ?? 0));
+        [$h, $m] = array_pad(explode('.', $current), 2, 0);
+        $h = (int)$h;
+        $m = (int)$m;
+
+        $total = $h * 60 + $m + $minutesToAdd;
+
+        $newHours = intdiv($total, 60);
+        $newMinutes = $total % 60;
+
+        return (float) sprintf('%d.%02d', $newHours, $newMinutes);
+    }
+
+    /**
      * Tampilkan detail assignment
      */
-    public function show(Assignment $assignment)
-    {
-        try {
-            $assignment->load(['order.product', 'driver', 'guide', 'assignedBy']);
-            return view('assignments.show', compact('assignment'));
-        } catch (\Throwable $e) {
-            Log::error('Assignment.show error: '.$e->getMessage(), ['assignment_id' => $assignment->id, 'trace'=>$e->getTraceAsString()]);
-            return redirect()->back()->with('error', 'Gagal membuka detail assignment.');
-        }
-    }
+    // public function show(Assignment $assignment)
+    // {
+    //     try {
+    //         $assignment->load(['order.product', 'driver', 'guide', 'assignedBy']);
+    //         return view('assignments.show', compact('assignment'));
+    //     } catch (\Throwable $e) {
+    //         Log::error('Assignment.show error: ' . $e->getMessage(), ['assignment_id' => $assignment->id]);
+    //         return redirect()->back()->with('error', 'Gagal membuka detail assignment.');
+    //     }
+    // }
 
     /**
      * Hapus assignment
@@ -174,7 +236,7 @@ class AssignmentController extends Controller
             $assignment->delete();
             return redirect()->route('assignments.index')->with('success', 'Assignment dihapus.');
         } catch (\Throwable $e) {
-            Log::error('Assignment.destroy error: '.$e->getMessage(), ['assignment_id' => $assignment->id, 'trace'=>$e->getTraceAsString()]);
+            Log::error('Assignment.destroy error: ' . $e->getMessage(), ['assignment_id' => $assignment->id]);
             return redirect()->back()->with('error', 'Gagal menghapus assignment.');
         }
     }
@@ -186,113 +248,38 @@ class AssignmentController extends Controller
     {
         try {
             $user = Auth::user();
-
             $assignments = Assignment::where(function ($q) use ($user) {
-                if ($user->role === 'driver') {
-                    $q->where('driver_id', $user->id);
-                } elseif ($user->role === 'guide') {
-                    $q->where('guide_id', $user->id);
-                }
+                if ($user->role === 'driver') $q->where('driver_id', $user->id);
+                if ($user->role === 'guide') $q->where('guide_id', $user->id);
             })->with(['order.product'])->orderBy('assigned_at', 'desc')->get();
 
             return view('assignments.my', compact('assignments'));
         } catch (\Throwable $e) {
-            Log::error('Assignment.myAssignments error: '.$e->getMessage(), ['user_id' => Auth::id(), 'trace'=>$e->getTraceAsString()]);
+            Log::error('Assignment.myAssignments error: ' . $e->getMessage(), ['user_id' => Auth::id()]);
             return redirect()->back()->with('error', 'Gagal mengambil daftar tugas Anda.');
         }
     }
 
     /**
-     * Ubah status assignment oleh driver/guide: accepted, declined, completed
-     * Digunakan untuk menggantikan accept() / decline() terpisah agar logika terpusat.
-     *
-     * Note: tidak ada variabel/cek bernama "admin_user" di controller ini.
-     */
-    public function changeStatus(Request $request, Assignment $assignment)
-    {
-        $request->validate([
-            'status' => 'required|in:accepted,declined,completed',
-        ]);
-
-        DB::beginTransaction();
-
-        try {
-            $user = Auth::user();
-
-            // Akses control: hanya driver/guide terkait yang bisa ubah status
-            $isDriver = $user->role === 'driver' && $assignment->driver_id === $user->id;
-            $isGuide  = $user->role === 'guide' && $assignment->guide_id === $user->id;
-
-            if (! $isDriver && ! $isGuide) {
-                abort(403, 'Unauthorized');
-            }
-
-            $newStatus = $request->post('status');
-
-            // Jika accepted -> cek jam kerja dan tambahkan used_hours
-            if ($newStatus === 'accepted') {
-                $estHours = $this->calculateEstimatedHours($assignment->order);
-
-                $ws = WorkSchedule::firstOrCreate(
-                    ['user_id' => $user->id, 'month' => now()->month, 'year' => now()->year],
-                    ['total_hours' => $user->monthly_work_limit ?? 200, 'used_hours' => 0]
-                );
-
-                if (($ws->used_hours + $estHours) > $ws->total_hours) {
-                    DB::rollBack();
-                    return redirect()->back()->with('error', 'Tidak cukup jam kerja tersisa untuk menerima tugas ini.');
-                }
-
-                $ws->used_hours += $estHours;
-                $ws->save();
-            }
-
-            // Simpan status assignment
-            $assignment->status = $newStatus;
-            $assignment->save();
-
-            // Jika completed -> set order completed
-            if ($newStatus === 'completed') {
-                $assignment->order->update(['status' => 'completed']);
-            }
-
-            DB::commit();
-
-            return redirect()->back()->with('success', 'Status tugas diperbarui.');
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            Log::error('Assignment.changeStatus error: '.$e->getMessage(), [
-                'assignment_id' => $assignment->id,
-                'user_id'       => Auth::id(),
-                'payload'       => $request->all(),
-                'trace'         => $e->getTraceAsString(),
-            ]);
-            return redirect()->back()->with('error', 'Gagal memperbarui status tugas.');
-        }
-    }
-
-    /**
-     * Utility: hitung estimasi jam dari order (menjadi integer jam, dibulatkan ke atas)
+     * Hitung estimasi jam dari order
      */
     protected function calculateEstimatedHours(Order $order): int
     {
-        // prefer estimated_duration_minutes jika ada, fallback ke difference pickup - arrival
-        $minutes = (int) ($order->estimated_duration_minutes ?? 0);
+        $minutes = (int)($order->estimated_duration_minutes ?? 0);
 
         if ($minutes <= 0 && $order->pickup_time && $order->arrival_time) {
             try {
                 $start = strtotime($order->pickup_time);
-                $end   = strtotime($order->arrival_time);
-                $diff  = max(0, $end - $start);
+                $end = strtotime($order->arrival_time);
+                $diff = max(0, $end - $start);
                 $minutes = (int) round($diff / 60);
             } catch (\Throwable $e) {
-                Log::warning('calculateEstimatedHours fallback parse error: '.$e->getMessage(), ['order_id' => $order->id]);
+                Log::warning('calculateEstimatedHours parse error: ' . $e->getMessage());
                 $minutes = 60;
             }
         }
 
-        if ($minutes <= 0) $minutes = 60; // default 1 jam jika tidak ada data
-
+        if ($minutes <= 0) $minutes = 60;
         return (int) ceil($minutes / 60);
     }
 }

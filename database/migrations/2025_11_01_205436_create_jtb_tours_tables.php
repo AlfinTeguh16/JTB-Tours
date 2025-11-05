@@ -76,7 +76,7 @@ return new class extends Migration
             $table->tinyInteger('month'); // 1..12
             $table->smallInteger('year');
             $table->integer('total_hours')->default(200);
-            $table->integer('used_hours')->default(0);
+            $table->float('used_hours')->default(0);
             $table->timestamps();
 
             $table->unique(['user_id','month','year']);
@@ -90,6 +90,10 @@ return new class extends Migration
             $table->foreignId('guide_id')->nullable()->constrained('users');
             $table->foreignId('assigned_by')->nullable()->constrained('users')->nullOnDelete();
             $table->enum('status',['pending','accepted','completed','declined'])->default('pending');
+            
+            $table->time('workstart')->nullable();
+            $table->time('workend')->nullable();
+            
             $table->dateTime('assigned_at')->nullable();
             $table->timestamps();
         });
@@ -103,7 +107,7 @@ return new class extends Migration
         Schema::table('assignments', function (Blueprint $table) {
             $table->index(['driver_id','status']);
             $table->index(['guide_id','status']);
-        });
+    });
     }
 
     public function down()

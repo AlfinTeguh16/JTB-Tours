@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductController;
@@ -17,17 +16,18 @@ use App\Http\Controllers\DashboardController;
 |--------------------------------------------------------------------------
 | Web Routes
 |--------------------------------------------------------------------------
+|
+| Main application routes. Dashboard is handled by DashboardController which
+| selects the appropriate view based on authenticated user's role.
+|
 */
 
-/*
- * Root route - Always redirect to login
- */
 Route::get('/', function () {
     return redirect()->route('login');
 })->name('home');
 
 /*
- * Authentication routes (public)
+ * Authentication (public)
  */
 Route::get('login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('login', [AuthController::class, 'login'])->name('login.post');
@@ -38,43 +38,19 @@ Route::post('register', [AuthController::class, 'register'])->name('register.pos
 Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 
 /*
- * Dashboard route (protected)
- * Hanya bisa diakses setelah login
+ * Dashboard (protected) - controller will choose view based on role
  */
-Route::get('/dashboard', function () {
-    if (!Auth::check()) {
-        return redirect()->route('login');
-    }
-
-    $user = Auth::user();
-
-    // Redirect berdasarkan role
-    if (in_array($user->role, ['driver','guide'])) {
-        return redirect()->route('assignments.my');
-    }
-
-    if (in_array($user->role, ['admin','super_admin'])) {
-        return redirect()->route('orders.index');
-    }
-
-    if ($user->role === 'staff') {
-        return redirect()->route('assignments.index');
-    }
-
-    // Fallback
-    return redirect()->route('orders.index');
-})->name('dashboard')->middleware('auth');
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware('auth')
+    ->name('dashboard');
 
 /*
-|--------------------------------------------------------------------------
-| Protected Routes (semua membutuhkan authentication)
-|--------------------------------------------------------------------------
-*/
-
+ * Protected routes (require authentication)
+ */
 Route::middleware(['auth'])->group(function () {
-    
+
     /*
-     * Users management (super_admin only)
+     * Users (super_admin only)
      */
     Route::middleware(['role:super_admin'])->group(function () {
         Route::resource('users', UserController::class);
@@ -103,70 +79,68 @@ Route::middleware(['auth'])->group(function () {
 
     /*
      * Assignments
+     * - staff/admin/super_admin can manage assignments (list/create/store/destroy)
+     * - driver & guide have /assignments/my and can change status
+     * - show route allowed for many roles
      */
-    // staff/admin/super_admin CRUD for assignments
     Route::middleware(['role:super_admin,admin,staff'])->group(function () {
-        Route::get('assignments', [AssignmentController::class,'index'])->name('assignments.index');
-        Route::get('assignments/create', [AssignmentController::class,'create'])->name('assignments.create');
-        Route::post('assignments', [AssignmentController::class,'store'])->name('assignments.store');
-        Route::delete('assignments/{assignment}', [AssignmentController::class,'destroy'])->name('assignments.destroy');
+        Route::get('assignments', [AssignmentController::class, 'index'])->name('assignments.index');
+        Route::get('assignments/create', [AssignmentController::class, 'create'])->name('assignments.create');
+        Route::post('assignments', [AssignmentController::class, 'store'])->name('assignments.store');
+        Route::delete('assignments/{assignment}', [AssignmentController::class, 'destroy'])->name('assignments.destroy');
     });
 
-    // driver & guide: their view + change status
+    // driver & guide: their personal view + change status
     Route::middleware(['role:driver,guide'])->group(function () {
-        Route::get('assignments/my', [AssignmentController::class,'myAssignments'])->name('assignments.my');
-        Route::post('assignments/{assignment}/status', [AssignmentController::class,'changeStatus'])->name('assignments.changeStatus');
+        Route::get('assignments/my', [AssignmentController::class, 'myAssignments'])->name('assignments.my');
+        Route::post('assignments/{assignment}/status', [AssignmentController::class, 'changeStatus'])->name('assignments.changeStatus');
     });
 
-    // allow show for authorized roles
-    Route::get('assignments/{assignment}', [AssignmentController::class,'show'])
+    // show assignment details (allowed roles)
+    Route::get('assignments/{assignment}', [AssignmentController::class, 'show'])
         ->name('assignments.show')
         ->middleware('role:super_admin,admin,staff,driver,guide');
 
     /*
      * Availability
      */
-    // admin/staff/super_admin view & force-change
     Route::middleware(['role:super_admin,admin,staff'])->group(function () {
-        Route::get('availability', [AvailabilityController::class,'index'])->name('availability.index');
-        Route::post('availability/{user}/force', [AvailabilityController::class,'forceChange'])->name('availability.force');
+        Route::get('availability', [AvailabilityController::class, 'index'])->name('availability.index');
+        Route::post('availability/{user}/force', [AvailabilityController::class, 'forceChange'])->name('availability.force');
     });
 
-    // driver/guide toggle self
     Route::middleware(['role:driver,guide'])->group(function () {
-        Route::post('availability/toggle', [AvailabilityController::class,'toggle'])->name('availability.toggle');
+        Route::post('availability/toggle', [AvailabilityController::class, 'toggle'])->name('availability.toggle');
     });
 
     /*
-     * Work Schedules (super_admin, admin, staff)
+     * Work schedules (super_admin, admin, staff)
      */
     Route::middleware(['role:super_admin,admin,staff'])->group(function () {
-        Route::get('work-schedules', [WorkScheduleController::class,'index'])->name('work-schedules.index');
-        Route::post('work-schedules/generate', [WorkScheduleController::class,'generateForAll'])->name('work-schedules.generate');
-        Route::post('work-schedules/bulk', [WorkScheduleController::class,'bulkUpdate'])->name('work-schedules.bulkUpdate');
-        Route::post('work-schedules/reset', [WorkScheduleController::class,'resetUsedHours'])->name('work-schedules.reset');
+        Route::get('work-schedules', [WorkScheduleController::class, 'index'])->name('work-schedules.index');
+        Route::post('work-schedules/generate', [WorkScheduleController::class, 'generateForAll'])->name('work-schedules.generate');
+        Route::post('work-schedules/bulk', [WorkScheduleController::class, 'bulkUpdate'])->name('work-schedules.bulkUpdate');
+        Route::post('work-schedules/reset', [WorkScheduleController::class, 'resetUsedHours'])->name('work-schedules.reset');
 
-        Route::get('work-schedules/{workSchedule}/edit', [WorkScheduleController::class,'edit'])->name('work-schedules.edit');
-        Route::put('work-schedules/{workSchedule}', [WorkScheduleController::class,'update'])->name('work-schedules.update');
+        Route::get('work-schedules/{workSchedule}/edit', [WorkScheduleController::class, 'edit'])->name('work-schedules.edit');
+        Route::put('work-schedules/{workSchedule}', [WorkScheduleController::class, 'update'])->name('work-schedules.update');
     });
 
     /*
      * Reports & Exports (super_admin, admin)
      */
     Route::middleware(['role:super_admin,admin'])->group(function () {
-        Route::get('reports', [ReportController::class,'index'])->name('reports.index');
-        Route::get('reports/export/excel', [ReportController::class,'exportExcel'])->name('reports.export.excel');
-        Route::get('reports/export/pdf', [ReportController::class,'exportPdf'])->name('reports.export.pdf');
-        Route::get('reports/{report}', [ReportController::class,'show'])->name('reports.show');
+        Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+        Route::get('reports/export/excel', [ReportController::class, 'exportExcel'])->name('reports.export.excel');
+        Route::get('reports/export/pdf', [ReportController::class, 'exportPdf'])->name('reports.export.pdf');
+        Route::get('reports/{report}', [ReportController::class, 'show'])->name('reports.show');
     });
 
 });
 
 /*
-|--------------------------------------------------------------------------
-| Public routes (tidak membutuhkan authentication)
-|--------------------------------------------------------------------------
-*/
-Route::get('/ping', function () { 
-    return response('pong', 200); 
+ * Health check
+ */
+Route::get('/ping', function () {
+    return response('pong', 200);
 });

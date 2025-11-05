@@ -9,12 +9,8 @@
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
           </button>
   
-          <a href="{{ url('/') }}" class="flex items-center space-x-2">
-            <div class="w-8 h-8 bg-blue-600 text-white rounded flex items-center justify-center font-bold">AP</div>
-            <div class="hidden sm:block">
-              <div class="text-sm font-semibold">AlphaPartner</div>
-              <div class="text-xs text-gray-500">Dashboard</div>
-            </div>
+          <a href="{{ url('/dashboard') }}" class="flex items-center space-x-2">
+            <img src="{{ asset('img/JTB_logo.png') }}" alt="" class="max-w-[50px]">
           </a>
         </div>
 
@@ -47,10 +43,10 @@
           </div>
   
           {{-- notifications placeholder --}}
-          <button class="p-2 rounded hover:bg-gray-100" title="Notifications">
+          {{-- <button class="p-2 rounded hover:bg-gray-100" title="Notifications">
             <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118.6 14.6L17 13V8a5 5 0 10-10 0v5l-1.6 1.6c-.3.3-.5.69-.5 1.12V17h14z"/></svg>
           </button>
-  
+   --}}
           {{-- user dropdown --}}
           <div x-data="{ open: false }" class="relative">
             <button @click="open = !open" class="flex items-center space-x-2 px-2 py-1 rounded hover:bg-gray-100">
@@ -62,7 +58,7 @@
             </button>
   
             <div x-show="open" @click.away="open=false" x-cloak class="absolute right-0 mt-2 w-48 bg-white rounded shadow z-50">
-              <a href="#" class="block px-4 py-2 text-sm hover:bg-gray-50">Profile</a>
+              {{-- <a href="#" class="block px-4 py-2 text-sm hover:bg-gray-50">Profile</a> --}}
               <a href="{{ route('work-schedules.index') }}" class="block px-4 py-2 text-sm hover:bg-gray-50">Work Schedule</a>
               <form method="POST" action="{{ route('logout') }}">
                 @csrf

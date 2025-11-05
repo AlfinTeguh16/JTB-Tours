@@ -50,6 +50,21 @@
 
       <tbody class="divide-y divide-gray-100">
         @forelse($users as $u)
+          @php
+            // Siapkan payload aman untuk modal
+            $payload = [
+              'id' => $u->id,
+              'name' => $u->name,
+              'email' => $u->email,
+              'phone' => $u->phone,
+              'role' => $u->role,
+              'join_date' => $u->join_date ? \Carbon\Carbon::parse($u->join_date)->format('d M Y') : '-',
+              'monthly_work_limit' => $u->monthly_work_limit,
+              'used_hours' => $u->used_hours,
+            ];
+            $payload_b64 = base64_encode(json_encode($payload, JSON_UNESCAPED_UNICODE));
+          @endphp
+
           <tr>
             <td class="px-4 py-3 text-sm">{{ $u->id }}</td>
             <td class="px-4 py-3 text-sm">
@@ -69,17 +84,13 @@
               @endif
             </td>
             <td class="px-4 py-3 text-sm text-right">
-              {{-- detail modal --}}
-              <button onclick="openUserModal(@json([
-                'id'=>$u->id,
-                'name'=>$u->name,
-                'email'=>$u->email,
-                'phone'=>$u->phone,
-                'role'=>$u->role,
-                'join_date'=>$u->join_date ? \Carbon\Carbon::parse($u->join_date)->format('d M Y') : '-',
-                'monthly_work_limit'=>$u->monthly_work_limit,
-                'used_hours'=>$u->used_hours,
-              ]) )" class="px-2 py-1 bg-indigo-600 text-white rounded text-xs">Detail</button>
+              {{-- tombol detail: gunakan data-payload-b64 agar aman --}}
+              <button
+                type="button"
+                class="px-2 py-1 bg-indigo-600 text-white rounded text-xs"
+                data-payload-b64="{{ $payload_b64 }}"
+                onclick="openUserModal(this)"
+              >Detail</button>
 
               <a href="{{ route('users.edit', $u) }}" class="px-2 py-1 ml-1 bg-yellow-400 text-white rounded text-xs">Edit</a>
 
@@ -115,7 +126,10 @@
       <div><strong>Phone:</strong> <span x-text="payload.phone || '-'"></span></div>
       <div><strong>Role:</strong> <span x-text="payload.role"></span></div>
       <div><strong>Join:</strong> <span x-text="payload.join_date"></span></div>
-      <div x-show="payload.role == 'driver' || payload.role == 'guide'"><strong>Jam:</strong> <span x-text="payload.used_hours + ' / ' + (payload.monthly_work_limit ?? '-')"></span></div>
+      <div x-show="payload.role == 'driver' || payload.role == 'guide'">
+        <strong>Jam:</strong>
+        <span x-text="(payload.used_hours ?? 0) + ' / ' + (payload.monthly_work_limit ?? '-')"></span>
+      </div>
     </div>
 
     <div class="mt-4 flex items-center justify-end">
@@ -133,7 +147,7 @@
       payload: {},
       init() {
         window.addEventListener('open-user-modal', (e) => {
-          this.payload = e.detail;
+          this.payload = e.detail || {};
           this.open = true;
         });
       },
@@ -141,9 +155,17 @@
     }
   }
 
-  function openUserModal(data) {
-    const evt = new CustomEvent('open-user-modal', { detail: data });
-    window.dispatchEvent(evt);
+  // Terima element tombol, baca data-payload-b64, decode lalu dispatch event
+  function openUserModal(el) {
+    try {
+      const raw = el.getAttribute('data-payload-b64');
+      if (!raw) return;
+      const json = atob(raw);
+      const payload = JSON.parse(json);
+      window.dispatchEvent(new CustomEvent('open-user-modal', { detail: payload }));
+    } catch (err) {
+      console.error('openUserModal error', err);
+    }
   }
 </script>
 @endpush

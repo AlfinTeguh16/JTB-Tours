@@ -36,14 +36,28 @@
             <td class="px-4 py-3 text-sm">{{ $p->name }}</td>
             <td class="px-4 py-3 text-sm">{{ $p->capacity }}</td>
             <td class="px-4 py-3 text-sm truncate max-w-xl">{{ $p->description ?? '-' }}</td>
-            <td class="px-4 py-3 text-sm text-right">
-              <button onclick="openProductModal(@json(['id'=>$p->id,'name'=>$p->name,'capacity'=>$p->capacity,'description'=>$p->description]))" class="px-2 py-1 bg-indigo-600 text-white rounded text-xs">Detail</button>
+            <td class="px-4 py-3 text-sm text-right space-x-1">
+              {{-- ✅ Fixed: safely encoded JSON --}}
+              @php
+                $jsonPayload = htmlspecialchars(json_encode([
+                  'id' => $p->id,
+                  'name' => $p->name,
+                  'capacity' => $p->capacity,
+                  'description' => $p->description,
+                ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
+              @endphp
 
-              <a href="{{ route('products.edit', $p) }}" class="px-2 py-1 ml-1 bg-yellow-400 text-white rounded text-xs">Edit</a>
+              <button 
+                onclick="openProductModal({!! $jsonPayload !!})"
+                class="px-2 py-1 bg-indigo-600 text-white rounded text-xs">
+                Detail
+              </button>
+
+              <a href="{{ route('products.edit', $p) }}" class="px-2 py-1 bg-yellow-400 text-white rounded text-xs">Edit</a>
 
               <form action="{{ route('products.destroy', $p) }}" method="POST" class="inline-block" onsubmit="return confirm('Hapus product ini?')">
                 @csrf @method('DELETE')
-                <button class="px-2 py-1 ml-1 bg-red-600 text-white rounded text-xs">Hapus</button>
+                <button class="px-2 py-1 bg-red-600 text-white rounded text-xs">Hapus</button>
               </form>
             </td>
           </tr>
@@ -93,7 +107,10 @@
           this.open = true;
         });
       },
-      close() { this.open = false; this.payload = {}; }
+      close() {
+        this.open = false;
+        this.payload = {};
+      }
     }
   }
 
@@ -103,5 +120,4 @@
   }
 </script>
 @endpush
-
 @endsection
