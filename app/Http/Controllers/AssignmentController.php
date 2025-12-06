@@ -55,17 +55,56 @@ class AssignmentController extends Controller
     {
         try {
             $orderId = $request->query('order');
-            $orders = Order::whereIn('status', ['pending', 'assigned'])->orderBy('pickup_time')->get();
-            $drivers = User::where('role', 'driver')->orderBy('name')->get();
-            $guides = User::where('role', 'guide')->orderBy('name')->get();
+            $orders = Order::whereIn('status', ['pending', 'assigned'])
+                ->orderBy('pickup_time')
+                ->get();
+    
+            $drivers = User::where('role', 'driver')
+                ->orderBy('name')
+                ->get();
+    
+            $guides = User::where('role', 'guide')
+                ->orderBy('name')
+                ->get();
+    
             $order = $orderId ? Order::find($orderId) : null;
-
-            return view('assignments.create', compact('orders', 'drivers', 'guides', 'order'));
+    
+            // ===== Tambahan: Work hours bulan ini =====
+            $month = now()->month;
+            $year  = now()->year;
+    
+            // Ambil work schedule semua driver bulan ini
+            $driverSchedules = WorkSchedule::whereIn('user_id', $drivers->pluck('id'))
+                ->where('month', $month)
+                ->where('year', $year)
+                ->get()
+                ->keyBy('user_id'); // key: user_id → WorkSchedule
+    
+            // Ambil work schedule semua guide bulan ini
+            $guideSchedules = WorkSchedule::whereIn('user_id', $guides->pluck('id'))
+                ->where('month', $month)
+                ->where('year', $year)
+                ->get()
+                ->keyBy('user_id');
+    
+            return view('assignments.create', compact(
+                'orders',
+                'drivers',
+                'guides',
+                'order',
+                'month',
+                'year',
+                'driverSchedules',
+                'guideSchedules'
+            ));
         } catch (\Throwable $e) {
-            Log::error('Assignment.create error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            Log::error('Assignment.create error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             return redirect()->back()->with('error', 'Gagal membuka form assignment.');
         }
     }
+    
 
     /**
      * Store assignment (dibuat oleh staff)
@@ -155,44 +194,86 @@ class AssignmentController extends Controller
         $user = Auth::user();
         $status = $request->status;
 
-        if (!in_array($user->role, ['driver', 'guide']) ||
-            ($assignment->driver_id !== $user->id && $assignment->guide_id !== $user->id)) {
-            abort(403, 'Anda tidak memiliki izin untuk mengubah status tugas ini.');
+        //  Validasi: hanya driver/guide yang bersangkutan
+        if (!in_array($user->role, ['driver', 'guide'])) {
+            abort(403, 'Hanya driver/guide yang boleh mengubah status.');
         }
 
-        // Accepted → catat waktu mulai
-        if ($status === 'accepted' && !$assignment->workstart) {
-            $assignment->workstart = now();
+        if ($user->role === 'driver' && $assignment->driver_id !== $user->id) {
+            abort(403, 'Anda bukan driver yang ditugaskan.');
         }
 
-        // Completed → hitung durasi dan update jam kerja
-        if ($status === 'completed' && !$assignment->workend) {
-            $assignment->workend = now();
+        if ($user->role === 'guide' && $assignment->guide_id !== $user->id) {
+            abort(403, 'Anda bukan guide yang ditugaskan.');
+        }
 
-            if ($assignment->workstart) {
-                $start = Carbon::parse($assignment->workstart);
-                $end = Carbon::parse($assignment->workend);
-                $diffMinutes = max(1, $end->diffInMinutes($start));
+        //  Validasi: hanya bisa ubah dari status tertentu
+        if ($status === 'accepted' && $assignment->status !== 'pending') {
+            return back()->with('error', 'Hanya assignment pending yang bisa di-accept.');
+        }
 
-                $month = now()->month;
-                $year = now()->year;
-                $userId = $assignment->driver_id ?? $assignment->guide_id;
+        if ($status === 'completed' && $assignment->status !== 'accepted') {
+            return back()->with('error', 'Hanya assignment accepted yang bisa di-complete.');
+        }
 
-                $ws = WorkSchedule::firstOrCreate(
-                    ['user_id' => $userId, 'month' => $month, 'year' => $year],
-                    ['total_hours' => 200, 'used_hours' => 0.00]
-                );
+        if ($status === 'declined' && $assignment->status !== 'pending') {
+            return back()->with('error', 'Hanya assignment pending yang bisa di-decline.');
+        }
 
-                $newUsed = $this->addUsedHoursHMM($ws->used_hours, $diffMinutes);
+        DB::beginTransaction();
 
-                $ws->update(['used_hours' => $newUsed]);
+        try {
+            // Saat accept → catat workstart
+            if ($status === 'accepted') {
+                $assignment->workstart = now();
             }
+
+            // Saat complete → hitung & update
+            if ($status === 'completed') {
+                $assignment->workend = now();
+                $assignment->completed_at = now(); // 🔥 KUNCI: untuk dashboard
+
+                if ($assignment->workstart) {
+                    $start = Carbon::parse($assignment->workstart);
+                    $end = Carbon::parse($assignment->workend);
+                    $diffMinutes = max(1, $end->diffInMinutes($start));
+
+                    $userId = $user->id; // yang complete = driver/guide saat ini
+                    $month = now()->month;
+                    $year = now()->year;
+
+                    $ws = WorkSchedule::firstOrCreate(
+                        ['user_id' => $userId, 'month' => $month, 'year' => $year],
+                        ['total_hours' => $user->monthly_work_limit ?? 200, 'used_hours' => 0.00]
+                    );
+
+                    $newUsed = $this->addUsedHoursHMM($ws->used_hours, $diffMinutes);
+                    $ws->update(['used_hours' => $newUsed]);
+                }
+
+                // 🔥 Update order ke completed
+                $order = $assignment->order;
+                if ($order && $order->status !== 'completed') {
+                    $order->update(['status' => 'completed']);
+                }
+            }
+
+            $assignment->status = $status;
+            $assignment->save();
+
+            DB::commit();
+
+            return back()->with('success', 'Status assignment berhasil diperbarui.');
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Assignment.changeStatus error: ' . $e->getMessage(), [
+                'assignment_id' => $assignment->id,
+                'user_id' => $user->id,
+                'status' => $status,
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return back()->with('error', 'Gagal memperbarui status. Silakan coba lagi.');
         }
-
-        $assignment->status = $status;
-        $assignment->save();
-
-        return back()->with('success', 'Status assignment diperbarui.');
     }
 
     /**
@@ -281,5 +362,29 @@ class AssignmentController extends Controller
 
         if ($minutes <= 0) $minutes = 60;
         return (int) ceil($minutes / 60);
+    }
+
+
+    public function myHistory()
+    {
+        try {
+            $user = Auth::user();
+
+            $assignments = Assignment::where(function ($q) use ($user) {
+                if ($user->role === 'driver') {
+                    $q->where('driver_id', $user->id);
+                } elseif ($user->role === 'guide') {
+                    $q->where('guide_id', $user->id);
+                }
+            })
+            ->with(['order.product', 'driver', 'guide'])
+            ->orderBy('updated_at', 'desc') // paling baru di atas
+            ->paginate(10); // pagination agar tidak overload
+
+            return view('assignments.my', compact('assignments'));
+        } catch (\Throwable $e) {
+            Log::error('Assignment.myHistory error: ' . $e->getMessage(), ['user_id' => Auth::id()]);
+            return redirect()->back()->with('error', 'Gagal memuat riwayat tugas.');
+        }
     }
 }

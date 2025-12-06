@@ -56,6 +56,7 @@ class ProductController extends Controller
             'name' => 'required|string|max:255',
             'capacity' => 'required|integer|min:1',
             'description' => 'nullable|string|max:2000',
+            'hour' => 'required|numeric|min:0',
         ]);
 
         DB::beginTransaction();
@@ -103,9 +104,10 @@ class ProductController extends Controller
     public function update(Request $request, Product $product)
     {
         $data = $request->validate([
-            'name' => 'required|string|max:255',
-            'capacity' => 'required|integer|min:1',
+            'name' => 'nullable|string|max:255',
+            'capacity' => 'nullable|integer|min:1',
             'description' => 'nullable|string|max:2000',
+            'hour' => 'nullable|numeric|min:0',
         ]);
 
         DB::beginTransaction();

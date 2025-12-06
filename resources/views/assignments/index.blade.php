@@ -45,7 +45,7 @@
     <table class="min-w-full divide-y divide-gray-200">
       <thead class="bg-gray-50">
         <tr>
-          <th class="px-4 py-2 text-left text-sm font-medium">ID</th>
+          <th class="px-4 py-2 text-left text-sm font-medium">No</th>
           <th class="px-4 py-2 text-left text-sm font-medium">Order</th>
           <th class="px-4 py-2 text-left text-sm font-medium">Driver / Guide</th>
           <th class="px-4 py-2 text-left text-sm font-medium">Assigned At</th>
@@ -82,7 +82,11 @@
           @endphp
 
           <tr>
-            <td class="px-4 py-3 text-sm">{{ $a->id }}</td>
+            {{-- nomor urut rapi per halaman --}}
+            <td class="px-4 py-3 text-sm">
+              {{ $assignments->firstItem() ? $assignments->firstItem() + $loop->index : $loop->iteration }}
+            </td>
+
             <td class="px-4 py-3 text-sm">
               <div class="font-medium">{{ $a->order->customer_name ?? '—' }}</div>
               <div class="text-xs text-gray-500">{{ $a->order->pickup_time ? \Carbon\Carbon::parse($a->order->pickup_time)->format('d M Y H:i') : '-' }}</div>
@@ -182,7 +186,7 @@
   </div>
 </div>
 
-@push('scripts')
+
 <script>
   function openAssignmentModal(payload) {
     const event = new CustomEvent('open-assignment-modal', { detail: payload });
@@ -224,5 +228,5 @@
     }
   }
 </script>
-@endpush
+
 @endsection

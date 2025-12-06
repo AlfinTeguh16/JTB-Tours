@@ -1,21 +1,20 @@
 @extends('layouts.app')
-@section('title', 'Dashboard - ' . ucfirst(auth()->user()->role))
+@section('title', 'Laporan - ' . ucfirst($user->role))
 
 @section('content')
 @php
-    $user              = auth()->user();
-    $assignmentsCount  = $assignmentsCount  ?? 0;
-    $recentAssignments = $recentAssignments ?? collect();
-    $usedHours         = $usedHours         ?? 0;
-    $totalHours        = $totalHours        ?? ($user->monthly_work_limit ?? 200);
-    $usagePercent      = $usagePercent      ?? 0;
-    $completedThisMonth = $completedThisMonth ?? 0;
-    $month             = $month ?? now()->month;
-    $year              = $year  ?? now()->year;
-    $completedPerMonth = $completedPerMonth ?? [];
-    $availableYears    = $availableYears    ?? [now()->year];
+    // Dari controller: $assignments, $summary, $chartData, $start, $end, $user, $usedHours, $totalHours, $usagePercent
 
-    // Tentukan warna progress bar
+    $totalTugas     = $summary['total']     ?? $assignments->count();
+    $completedTugas = $summary['completed'] ?? $assignments->where('status', 'completed')->count();
+
+    // Label periode (pakai awal periode)
+    $periodeLabel = $start->format('F Y');
+
+    // “Tugas terbaru” batasi 10
+    $recentAssignments = $assignments->take(10);
+
+    // Tentukan warna progress bar jam kerja
     if ($usagePercent > 90) {
         $usageClass = 'bg-red-500';
     } elseif ($usagePercent > 70) {
@@ -23,49 +22,26 @@
     } else {
         $usageClass = 'bg-green-500';
     }
-
-    $dashboardRoute = $user->role === 'driver' ? 'dashboard.driver' : 'dashboard.guide';
 @endphp
 
 <div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
-  <!-- Header + Filter Tahun -->
+  <!-- Header -->
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
     <div>
-      <h1 class="text-2xl font-bold text-gray-900">Dashboard {{ ucfirst($user->role) }}</h1>
+      <h1 class="text-2xl font-bold text-gray-900">Laporan {{ ucfirst($user->role) }}</h1>
       <p class="text-sm text-gray-500">
         Halo, <span class="font-medium">{{ $user->name }}</span>
-      </p>
-      <p class="text-xs text-gray-400 mt-1">
-        Bulan aktif untuk ringkasan: {{ \Carbon\Carbon::create($year, $month, 1)->format('F Y') }}
+        <span class="ml-1">— periode {{ $start->format('d M Y') }} s/d {{ $end->format('d M Y') }}</span>
       </p>
     </div>
-
-    <form
-      method="GET"
-      action="{{ route($dashboardRoute) }}"
-      class="flex items-center gap-2 text-sm"
-    >
-      <label for="year" class="text-gray-600">Tahun (untuk chart):</label>
-      <select
-        id="year"
-        name="year"
-        class="border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-        onchange="this.form.submit()"
-      >
-        @foreach($availableYears as $y)
-          <option value="{{ $y }}" {{ (int)$y === (int)$year ? 'selected' : '' }}>
-            {{ $y }}
-          </option>
-        @endforeach
-      </select>
-      {{-- Kalau mau, bisa juga tambahkan filter bulan di sini --}}
-      {{-- <select name="month">...</select> --}}
-    </form>
+    <div class="text-sm bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full">
+      {{ $periodeLabel }}
+    </div>
   </div>
 
   <!-- Stats Cards -->
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <!-- Total Tugas Bulan Ini -->
+    <!-- Total Tugas -->
     <div class="bg-white rounded-lg shadow p-5">
       <div class="flex items-center">
         <div class="p-3 bg-indigo-100 rounded-lg">
@@ -74,13 +50,13 @@
           </svg>
         </div>
         <div class="ml-4">
-          <h3 class="text-sm font-medium text-gray-500">Total Tugas Bulan Ini</h3>
-          <p class="text-2xl font-bold text-gray-900">{{ $assignmentsCount }}</p>
+          <h3 class="text-sm font-medium text-gray-500">Total Tugas</h3>
+          <p class="text-2xl font-bold text-gray-900">{{ $totalTugas }}</p>
         </div>
       </div>
     </div>
 
-    <!-- Jam Kerja Digunakan -->
+    <!-- Jam Kerja -->
     <div class="bg-white rounded-lg shadow p-5">
       <div class="flex items-center">
         <div class="p-3 bg-green-100 rounded-lg">
@@ -89,7 +65,7 @@
           </svg>
         </div>
         <div class="ml-4">
-          <h3 class="text-sm font-medium text-gray-500">Jam Kerja Bulan Ini</h3>
+          <h3 class="text-sm font-medium text-gray-500">Jam Kerja</h3>
           <p class="text-2xl font-bold text-gray-900">{{ $usedHours }} / {{ $totalHours }} jam</p>
         </div>
       </div>
@@ -100,14 +76,14 @@
         </div>
       </div>
       <p class="mt-1 text-xs text-gray-500">
-        {{ $usagePercent }}% dari kuota jam kerja digunakan
+        {{ $usagePercent }}% digunakan
         @if($usagePercent >= 90)
           <span class="text-red-600 font-medium">— Hampir penuh!</span>
         @endif
       </p>
     </div>
 
-    <!-- Tugas Selesai Bulan Ini -->
+    <!-- Tugas Selesai -->
     <div class="bg-white rounded-lg shadow p-5">
       <div class="flex items-center">
         <div class="p-3 bg-blue-100 rounded-lg">
@@ -116,36 +92,32 @@
           </svg>
         </div>
         <div class="ml-4">
-          <h3 class="text-sm font-medium text-gray-500">Selesai Bulan Ini</h3>
+          <h3 class="text-sm font-medium text-gray-500">Selesai Periode Ini</h3>
           <p class="text-2xl font-bold text-gray-900">
-            {{ $completedThisMonth }}
+            {{ $completedTugas }}
           </p>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Chart: Completed per Month (setahun) -->
+  <!-- Chart Performa (Total vs Completed per Hari) -->
   <div class="bg-white rounded-lg shadow p-5">
     <div class="flex items-center justify-between mb-4">
-      <div>
-        <h2 class="text-lg font-semibold text-gray-900">
-          Tugas Selesai per Bulan ({{ $year }})
-        </h2>
-        <p class="text-xs text-gray-500">
-          Menampilkan jumlah assignment dengan status <span class="font-semibold">completed</span> per bulan dalam tahun terpilih.
-        </p>
-      </div>
+      <h2 class="text-lg font-semibold text-gray-900">Performa Tugas per Hari</h2>
+      <p class="text-xs text-gray-500">
+        Menampilkan total tugas dan tugas selesai per hari untuk periode dipilih.
+      </p>
     </div>
     <div class="h-72">
-      <canvas id="completedPerMonthChart"></canvas>
+      <canvas id="assignmentsChart"></canvas>
     </div>
   </div>
 
   <!-- Recent Assignments -->
   <div class="bg-white rounded-lg shadow">
     <div class="px-5 py-4 border-b">
-      <h2 class="text-lg font-semibold text-gray-900">Tugas Terbaru Bulan Ini</h2>
+      <h2 class="text-lg font-semibold text-gray-900">Tugas Terbaru</h2>
     </div>
     <div class="divide-y">
       @if($recentAssignments->isEmpty())
@@ -153,7 +125,7 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <p class="mt-2">Belum ada tugas pada bulan ini.</p>
+          <p class="mt-2">Belum ada tugas pada periode ini.</p>
         </div>
       @else
         @foreach($recentAssignments as $a)
@@ -210,40 +182,62 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   (function () {
-    const rawData = @json($completedPerMonth);
+    const rawData = @json($chartData);
 
-    console.log('completedPerMonth:', rawData);
+    console.log('chartData:', rawData);
 
-    const labels = rawData.map(item => item.label);
-    const data   = rawData.map(item => item.completed);
+    if (!rawData || rawData.length === 0) {
+      console.warn('Tidak ada data untuk chart');
+      return;
+    }
 
-    const canvas = document.getElementById('completedPerMonthChart');
+    const labels = rawData.map(item => item.date);
+    const completedData = rawData.map(item => item.completed);
+    const totalData = rawData.map(item => item.total);
+
+    const canvas = document.getElementById('assignmentsChart');
     if (!canvas) {
-      console.error('Canvas #completedPerMonthChart tidak ditemukan');
+      console.error('Canvas #assignmentsChart tidak ditemukan');
       return;
     }
 
     const ctx = canvas.getContext('2d');
 
     new Chart(ctx, {
-      type: 'bar',
+      type: 'line',
       data: {
         labels: labels,
         datasets: [
           {
-            label: 'Tugas selesai',
-            data: data,
-            borderWidth: 1,
+            label: 'Total Tugas',
+            data: totalData,
+            borderColor: 'rgba(37, 99, 235, 1)',
+            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+            borderWidth: 2,
+            tension: 0.3,
+          },
+          {
+            label: 'Tugas Selesai',
+            data: completedData,
+            borderColor: 'rgba(16, 185, 129, 1)',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            borderWidth: 2,
+            tension: 0.3,
           }
         ]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
         scales: {
           x: {
             ticks: {
-              autoSkip: false,
+              autoSkip: true,
+              maxTicksLimit: 10,
             }
           },
           y: {
@@ -253,12 +247,12 @@
         },
         plugins: {
           legend: {
-            display: false
+            position: 'bottom'
           },
           tooltip: {
             callbacks: {
-              label: function (context) {
-                return 'Selesai: ' + context.parsed.y + ' tugas';
+              label: function(context) {
+                return context.dataset.label + ': ' + context.parsed.y + ' tugas';
               }
             }
           }

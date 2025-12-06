@@ -18,6 +18,7 @@ class User extends Authenticatable
         'role',
         'email',
         'phone',
+        'profile_photo',
         'join_date',
         'password',
         'monthly_work_limit',

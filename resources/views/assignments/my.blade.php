@@ -7,110 +7,90 @@
 @include('partials.flash-and-modal')
 
 <div class="max-w-4xl mx-auto p-4">
-  <div class="flex items-center justify-between mb-4">
+  <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-semibold">Tugas Saya</h1>
   </div>
 
-  <div class="space-y-3">
-    @forelse($assignments as $a)
-      @php
-        // safe access helpers
-        $order = $a->order ?? null;
+  @php
+    // Kelompokkan assignment berdasarkan status
+    $pending = $assignments->where('status', 'pending');
+    $accepted = $assignments->where('status', 'accepted');
+    $history = $assignments->whereIn('status', ['completed', 'declined']);
+  @endphp
 
-        // pickup formatting
-        $orderPickup = '-';
-        if ($order && !empty($order->pickup_time)) {
-          try {
-            $orderPickup = \Carbon\Carbon::parse($order->pickup_time)->format('d M Y H:i');
-          } catch (\Throwable $e) {
-            $orderPickup = '-';
-          }
-        }
+  {{-- === Bagian 1: Tugas Pending === --}}
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-3">
+      <h2 class="text-lg font-medium text-gray-800">Tugas Menunggu</h2>
+      <span class="bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded-full">
+        {{ $pending->count() }}
+      </span>
+    </div>
 
-        // product name (safe)
-        $productName = '-';
-        if ($order && isset($order->product)) {
-          // handle relationship object or array
-          $productName = $order->product->name ?? (is_array($order->product) ? ($order->product['name'] ?? '-') : '-');
-        } elseif (isset($order->product->name)) {
-          $productName = $order->product->name ?? '-';
-        }
-
-        // driver payload
-        $driverPayload = null;
-        if (!empty($a->driver)) {
-          $driverPayload = [
-            'id' => $a->driver->id ?? null,
-            'name' => $a->driver->name ?? null,
-            'phone' => $a->driver->phone ?? null,
-          ];
-        }
-
-        // guide payload
-        $guidePayload = null;
-        if (!empty($a->guide)) {
-          $guidePayload = [
-            'id' => $a->guide->id ?? null,
-            'name' => $a->guide->name ?? null,
-            'phone' => $a->guide->phone ?? null,
-          ];
-        }
-
-        // prepare payload and JSON string safely
-        $payload = [
-          'id' => $a->id,
-          'order' => [
-            'customer' => $order->customer_name ?? '-',
-            'pickup' => $orderPickup,
-            'from' => $order->pickup_location ?? '-',
-            'to' => $order->destination ?? '-',
-            'product' => $productName ?? '-',
-          ],
-          'driver' => $driverPayload,
-          'guide' => $guidePayload,
-          'status' => $a->status ?? '-',
-          'note' => $a->note ?? null,
-        ];
-
-        // json encode once here to avoid inline parsing issues
-        $payloadJson = json_encode($payload);
-      @endphp
-
-      <div class="bg-white p-3 rounded shadow flex items-center justify-between">
-        <div>
-          <div class="font-medium">#{{ $a->id }} — {{ $order->customer_name ?? '-' }}</div>
-          <div class="text-xs text-gray-500">
-            {{ $orderPickup }} · {{ $productName ?? '-' }}
-          </div>
-        </div>
-
-        <div class="flex items-center space-x-2">
-          <span class="text-sm text-gray-600">{{ ucfirst($a->status ?? '-') }}</span>
-
-          {{-- Open modal with safe JSON payload (payloadJson already encoded) --}}
-          <button
-            onclick='openAssignmentModal({!! $payloadJson !!})'
-            class="px-3 py-1 bg-indigo-600 text-white rounded text-sm"
-            type="button"
-          >
-            Detail & Action
-          </button>
-        </div>
+    @if($pending->isNotEmpty())
+      <div class="space-y-3">
+        @foreach($pending as $a)
+          @include('assignments._assignment-card', ['a' => $a, 'showActions' => true])
+        @endforeach
       </div>
-    @empty
-      <div class="bg-white p-4 rounded shadow text-center text-gray-500">Belum ada tugas.</div>
-    @endforelse
+    @else
+      <div class="text-sm text-gray-500 italic">Tidak ada tugas menunggu.</div>
+    @endif
   </div>
 
-  {{-- pagination if present (controller should paginate) --}}
-  @if(isset($assignments) && method_exists($assignments, 'links'))
-    <div class="mt-4">
-      {{ $assignments->appends(request()->query())->links() }}
+  {{-- === Bagian 2: Tugas Diterima (Sedang Dikerjakan) === --}}
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-3">
+      <h2 class="text-lg font-medium text-gray-800">Tugas Diterima</h2>
+      <span class="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full">
+        {{ $accepted->count() }}
+      </span>
     </div>
-  @endif
+
+    @if($accepted->isNotEmpty())
+      <div class="space-y-3">
+        @foreach($accepted as $a)
+          @include('assignments._assignment-card', ['a' => $a, 'showActions' => true])
+        @endforeach
+      </div>
+    @else
+      <div class="text-sm text-gray-500 italic">Tidak ada tugas yang sedang dikerjakan.</div>
+    @endif
+  </div>
+
+  {{-- === Bagian 3: Riwayat (Completed & Declined) === --}}
+  <div>
+    <div class="flex items-center gap-2 mb-3">
+      <h2 class="text-lg font-medium text-gray-800">Riwayat Tugas</h2>
+      <span class="bg-gray-100 text-gray-800 text-xs px-2 py-0.5 rounded-full">
+        {{ $history->count() }}
+      </span>
+    </div>
+
+    @if($history->isNotEmpty())
+      <div class="space-y-3">
+        @foreach($history as $a)
+          @include('assignments._assignment-card', ['a' => $a, 'showActions' => false])
+        @endforeach
+      </div>
+
+      {{-- Pagination hanya untuk riwayat jika > 10 --}}
+      @if($history->count() > 10)
+        <div class="mt-4 text-center">
+          <button type="button"
+            class="text-sm text-blue-600 hover:underline"
+            onclick="alert('Fitur riwayat lengkap akan dikembangkan di versi berikutnya.')">
+            Lihat lebih banyak riwayat →
+          </button>
+        </div>
+      @endif
+    @else
+      <div class="text-sm text-gray-500 italic">Belum ada riwayat tugas.</div>
+    @endif
+  </div>
 </div>
 
-{{-- Modal for assignment details --}}
+{{-- Modal tetap sama — tidak diubah --}}
 <div
   x-data="assignmentModal()"
   x-init="init()"
@@ -119,10 +99,7 @@
   class="fixed inset-0 z-50 flex items-center justify-center p-4"
   style="display: none;"
 >
-  {{-- backdrop --}}
   <div class="absolute inset-0 bg-black/40" @click="close()" aria-hidden="true"></div>
-
-  {{-- panel --}}
   <div
     class="relative bg-white rounded shadow-lg max-w-2xl w-full z-50 p-4"
     x-transition
@@ -148,42 +125,52 @@
     </div>
 
     <div class="mt-4 flex items-center justify-end space-x-2">
-      {{-- Actions for performer (driver/guide) --}}
       @auth
-      <template x-if="isCurrentPerformer()">
+      <template x-if="isCurrentPerformer() && ['pending','accepted'].includes(payload.status)">
         <div class="flex items-center space-x-2">
-          {{-- Accept --}}
-          <form x-bind:action="changeStatusUrl('accepted')" method="POST" x-ref="formAccept">
-            <input type="hidden" name="_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="status" value="accepted">
-            <button type="button" @click="confirmAndSubmit($refs.formAccept)" class="px-3 py-2 bg-green-600 text-white rounded">Accept</button>
-          </form>
-
-          {{-- Decline --}}
-          <form x-bind:action="changeStatusUrl('declined')" method="POST" x-ref="formDecline">
-            <input type="hidden" name="_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="status" value="declined">
-            <button type="button" @click="confirmAndSubmit($refs.formDecline)" class="px-3 py-2 bg-red-600 text-white rounded">Decline</button>
-          </form>
-
-          {{-- Complete --}}
-          <form x-bind:action="changeStatusUrl('completed')" method="POST" x-ref="formCompleted">
-            <input type="hidden" name="_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="status" value="completed">
-            <button type="button" @click="confirmAndSubmit($refs.formCompleted)" class="px-3 py-2 bg-blue-600 text-white rounded">Complete</button>
-          </form>
+          <template x-if="payload.status === 'pending'">
+            <form x-bind:action="changeStatusUrl('accepted')" method="POST" x-ref="formAccept">
+              <input type="hidden" name="_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="status" value="accepted">
+              <button type="button" @click="confirmAndSubmit($refs.formAccept)" class="px-3 py-2 bg-green-600 text-white rounded text-sm">Accept</button>
+            </form>
+            <form x-bind:action="changeStatusUrl('declined')" method="POST" x-ref="formDecline">
+              <input type="hidden" name="_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="status" value="declined">
+              <button type="button" @click="confirmAndSubmit($refs.formDecline)" class="px-3 py-2 bg-red-600 text-white rounded text-sm">Decline</button>
+            </form>
+          </template>
+          <template x-if="payload.status === 'accepted'">
+            <form x-bind:action="changeStatusUrl('completed')" method="POST" x-ref="formCompleted">
+              <input type="hidden" name="_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="status" value="completed">
+              <button type="button" @click="confirmAndSubmit($refs.formCompleted)" class="px-3 py-2 bg-blue-600 text-white rounded text-sm">Complete</button>
+            </form>
+          </template>
         </div>
       </template>
       @endauth
 
-      <button @click="close()" class="px-3 py-2 bg-gray-200 rounded">Close</button>
+      <button @click="close()" class="px-3 py-2 bg-gray-200 rounded text-sm">Close</button>
     </div>
   </div>
 </div>
 
+{{-- === Extract Card ke Partial (opsional tapi direkomendasikan) === --}}
+@push('inline-styles')
+<style>
+  .status-badge {
+    @apply px-2 py-0.5 text-xs font-medium rounded-full;
+  }
+  .status-pending { @apply bg-yellow-100 text-yellow-800; }
+  .status-accepted { @apply bg-green-100 text-green-800; }
+  .status-completed { @apply bg-blue-100 text-blue-800; }
+  .status-declined { @apply bg-red-100 text-red-800; }
+</style>
+@endpush
+
 @push('scripts')
 <script>
-  // open modal from inline onclick
   function openAssignmentModal(payload) {
     const event = new CustomEvent('open-assignment-modal', { detail: payload });
     window.dispatchEvent(event);
@@ -193,8 +180,6 @@
     return {
       open: false,
       payload: {},
-
-      // inject current user info safely
       currentUserId: {!! json_encode(auth()->check() ? auth()->id() : null) !!},
       currentUserRole: {!! json_encode(auth()->check() ? auth()->user()->role : null) !!},
 
@@ -204,27 +189,19 @@
           this.open = true;
         });
       },
-
       close() {
         this.open = false;
         this.payload = {};
       },
-
-      // check if current authenticated user is the driver or guide for this assignment
       isCurrentPerformer() {
         if (!this.currentUserId) return false;
         if (this.currentUserRole === 'driver' && this.payload.driver && this.payload.driver.id == this.currentUserId) return true;
         if (this.currentUserRole === 'guide' && this.payload.guide && this.payload.guide.id == this.currentUserId) return true;
         return false;
       },
-
-      // returns URL for posting status change
       changeStatusUrl(status) {
-        if (!this.payload || !this.payload.id) return '#';
-        // matches route: POST /assignments/{assignment}/status
         return `/assignments/${this.payload.id}/status`;
       },
-
       confirmAndSubmit(formRef) {
         if (!confirm('Yakin ingin melakukan aksi ini?')) return;
         formRef.submit();

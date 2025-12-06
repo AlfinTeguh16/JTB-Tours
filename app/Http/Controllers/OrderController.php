@@ -18,61 +18,69 @@ class OrderController extends Controller
     {
         try {
             $q = Order::with('product', 'createdBy')->orderBy('pickup_time', 'desc');
-    
-            // Filters
+
             if ($request->filled('q')) {
                 $search = $request->q;
                 $q->where(function ($w) use ($search) {
                     $w->where('customer_name', 'like', "%{$search}%")
-                      ->orWhere('phone', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%")
-                      ->orWhere('pickup_location', 'like', "%{$search}%")
-                      ->orWhere('destination', 'like', "%{$search}%");
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('pickup_location', 'like', "%{$search}%")
+                    ->orWhere('destination', 'like', "%{$search}%");
                 });
             }
-    
+
             if ($request->filled('product_id')) {
                 $q->where('product_id', $request->product_id);
             }
-    
+
             if ($request->filled('status')) {
                 $q->where('status', $request->status);
+            } else {
+                $q->where('status', '!=', 'completed'); 
             }
-    
+
             if ($request->filled('from')) {
                 $q->whereDate('pickup_time', '>=', $request->from);
             }
-    
+
             if ($request->filled('to')) {
                 $q->whereDate('pickup_time', '<=', $request->to);
             }
-    
-            // paginate once
+
             $orders = $q->paginate(25)->withQueryString();
-    
-            // Produk untuk dropdown filter di view
+
+
             $products = Product::orderBy('name')->get();
-    
-            // Tambahkan formatted fields supaya view lebih sederhana dan analyzer tidak complain
+
+
             $orders->getCollection()->transform(function ($o) {
                 try {
-                    $o->formatted_pickup = $o->pickup_time ? \Carbon\Carbon::parse($o->pickup_time)->format('d M Y H:i') : '-';
+                    $o->formatted_pickup = $o->pickup_time
+                        ? \Carbon\Carbon::parse($o->pickup_time)->format('d M Y H:i')
+                        : '-';
                 } catch (\Throwable $e) {
                     $o->formatted_pickup = '-';
                 }
-    
+
                 try {
-                    $o->formatted_arrival = $o->arrival_time ? \Carbon\Carbon::parse($o->arrival_time)->format('d M Y H:i') : '-';
+                    $o->formatted_arrival = $o->arrival_time
+                        ? \Carbon\Carbon::parse($o->arrival_time)->format('d M Y H:i')
+                        : '-';
                 } catch (\Throwable $e) {
                     $o->formatted_arrival = '-';
                 }
-    
-                $o->summary_people = ($o->adults ?? 0) . ' adults · ' . ($o->children ?? 0) . ' children · ' . ($o->babies ?? 0) . ' babies';
+
+                $o->summary_people =
+                    ($o->adults ?? 0) . ' adults · ' .
+                    ($o->children ?? 0) . ' children · ' .
+                    ($o->babies ?? 0) . ' babies';
+
                 $o->summary_contact = ($o->email ?? '-') . ' · ' . ($o->phone ?? '-');
-    
+
                 return $o;
             });
-    
+
             return view('orders.index', compact('orders', 'products'));
         } catch (\Throwable $e) {
             Log::error('Order.index error: ' . $e->getMessage(), [
@@ -82,6 +90,7 @@ class OrderController extends Controller
             return redirect()->back()->with('error', 'Gagal mengambil daftar order.');
         }
     }
+
     
 
     /**
@@ -202,6 +211,17 @@ class OrderController extends Controller
 
         DB::beginTransaction();
         try {
+            // server-side capacity check
+            $product = Product::find($validated['product_id']);
+            $adults = $validated['adults'] ?? 0;
+            $children = $validated['children'] ?? 0;
+            $babies = $validated['babies'] ?? 0;
+            $totalPassengers = $adults + $children + $babies;
+
+            if ($product && $product->capacity !== null && $product->capacity > 0 && $totalPassengers > $product->capacity) {
+                return redirect()->back()->withInput()->with('error', 'Total penumpang melebihi kapasitas product (' . $product->capacity . ').');
+            }
+
             // recalc estimated duration if not provided but arrival_time exists
             $est = $validated['estimated_duration_minutes'] ?? null;
             if (empty($est) && !empty($validated['arrival_time']) && !empty($validated['pickup_time'])) {
@@ -222,6 +242,7 @@ class OrderController extends Controller
             return redirect()->back()->withInput()->with('error', 'Gagal memperbarui order.');
         }
     }
+
 
     /**
      * Remove the specified order from storage.

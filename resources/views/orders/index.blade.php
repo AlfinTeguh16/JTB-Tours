@@ -82,17 +82,22 @@
       <tbody class="divide-y divide-gray-100">
         @forelse($orders as $o)
           <tr class="hover:bg-gray-50">
-            <td class="px-4 py-3">{{ $o->id }}</td>
+            {{-- nomor urut yang rapi: pertama pada halaman + loop index --}}
+            <td class="px-4 py-3">{{ $orders->firstItem() ? $orders->firstItem() + $loop->index : $loop->iteration }}</td>
+
             <td class="px-4 py-3">
               <div class="font-medium">{{ $o->customer_name ?? '-' }}</div>
               <div class="text-xs text-gray-500">{{ $o->summary_contact ?? '-' }}</div>
             </td>
+
             <td class="px-4 py-3">
               <div>{{ $o->formatted_pickup ?? '-' }}</div>
               <div class="text-xs text-gray-500">{{ $o->formatted_arrival ?? '-' }}</div>
             </td>
+
             <td class="px-4 py-3">{{ optional($o->product)->name ?? '-' }}</td>
             <td class="px-4 py-3 whitespace-nowrap">{{ $o->summary_people ?? '-' }}</td>
+
             <td class="px-4 py-3">
               <span class="px-2 py-1 rounded text-xs font-medium
                 {{ $o->status == 'completed' ? 'bg-blue-100 text-blue-800' :
@@ -100,6 +105,7 @@
                 {{ ucfirst($o->status ?? 'pending') }}
               </span>
             </td>
+
             <td class="px-4 py-3 text-right whitespace-nowrap">
               @php
                 $payload = [

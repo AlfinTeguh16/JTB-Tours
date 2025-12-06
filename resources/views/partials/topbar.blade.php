@@ -33,14 +33,14 @@
   
         <div class="flex items-center space-x-3">
           {{-- optional search --}}
-          <div class="hidden sm:block">
+          {{-- <div class="hidden sm:block">
             <form method="GET" action="#" class="relative">
               <input name="q" placeholder="Cari..." class="pl-3 pr-8 py-1 rounded border-gray-200 bg-gray-50 text-sm" />
               <button type="submit" class="absolute right-0 top-0 mt-1 mr-1 text-gray-400">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
               </button>
             </form>
-          </div>
+          </div> --}}
   
           {{-- notifications placeholder --}}
           {{-- <button class="p-2 rounded hover:bg-gray-100" title="Notifications">
@@ -58,8 +58,8 @@
             </button>
   
             <div x-show="open" @click.away="open=false" x-cloak class="absolute right-0 mt-2 w-48 bg-white rounded shadow z-50">
-              {{-- <a href="#" class="block px-4 py-2 text-sm hover:bg-gray-50">Profile</a> --}}
-              <a href="{{ route('work-schedules.index') }}" class="block px-4 py-2 text-sm hover:bg-gray-50">Work Schedule</a>
+              <a href="{{ route('profile.edit') }}" class="block px-4 py-2 text-sm hover:bg-gray-50">Profile</a>
+              {{-- <a href="{{ route('work-schedules.index') }}" class="block px-4 py-2 text-sm hover:bg-gray-50">Work Schedule</a> --}}
               <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <button type="submit" class="w-full text-left px-4 py-2 text-sm hover:bg-gray-50">Logout</button>

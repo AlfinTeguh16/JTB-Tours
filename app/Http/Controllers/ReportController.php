@@ -7,83 +7,217 @@ use App\Models\Assignment;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use App\Exports\OrdersExport;
+use Illuminate\Support\Facades\Auth;
 use App\Exports\OrdersQueryExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 
 class ReportController extends Controller
 {
+    /**
+     * Index: otomatis arahkan ke laporan sesuai role
+     */
     public function index(Request $request)
     {
-        $year = $request->query('year', date('Y'));
+        $user = Auth::user();
+
+        // Jika admin/staff → tampilkan laporan sistem
+        if (in_array($user->role, ['admin', 'super_admin', 'staff'])) {
+            return $this->adminReport($request);
+        }
+
+        // Jika driver/guide → tampilkan laporan pribadi
+        if (in_array($user->role, ['driver', 'guide'])) {
+            return $this->personalReport($request);
+        }
+
+        abort(403, 'Laporan tidak tersedia untuk role Anda.');
+    }
+
+    // ========================================================================
+    // 🔹 LAPORAN SISTEM (Admin/Staff)
+    // ========================================================================
+
+    private function adminReport(Request $request)
+    {
+        $year  = $request->query('year', date('Y'));
         $month = $request->query('month', null);
 
-        $ordersQuery = Order::select(DB::raw("MONTH(pickup_time) as month"), DB::raw("COUNT(*) as total"))
+        // Orders per bulan
+        $ordersQuery = Order::select(
+                DB::raw("MONTH(pickup_time) as month"),
+                DB::raw("COUNT(*) as total")
+            )
             ->whereYear('pickup_time', $year)
             ->groupBy(DB::raw("MONTH(pickup_time)"))
             ->orderBy('month')
             ->get();
 
         $ordersPerMonth = [];
-        for ($m=1;$m<=12;$m++) {
-            $row = $ordersQuery->firstWhere('month',$m);
-            $ordersPerMonth[$m] = $row ? (int)$row->total : 0;
+        for ($m = 1; $m <= 12; $m++) {
+            $row = $ordersQuery->firstWhere('month', $m);
+            $ordersPerMonth[$m] = $row ? (int) $row->total : 0;
         }
 
-        $assignAccepted = Assignment::select(DB::raw("MONTH(assigned_at) as month"), DB::raw("COUNT(*) as total"))
-            ->where('status','accepted')
-            ->whereYear('assigned_at',$year)
+        // Assignment accepted per bulan
+        $assignAccepted = Assignment::select(
+                DB::raw("MONTH(assigned_at) as month"),
+                DB::raw("COUNT(*) as total")
+            )
+            ->where('status', 'accepted')
+            ->whereYear('assigned_at', $year)
             ->groupBy(DB::raw("MONTH(assigned_at)"))
             ->get();
 
         $acceptedPerMonth = [];
-        for ($m=1;$m<=12;$m++) {
-            $row = $assignAccepted->firstWhere('month',$m);
-            $acceptedPerMonth[$m] = $row ? (int)$row->total : 0;
+        for ($m = 1; $m <= 12; $m++) {
+            $row = $assignAccepted->firstWhere('month', $m);
+            $acceptedPerMonth[$m] = $row ? (int) $row->total : 0;
         }
 
-        $productUsage = Product::select('products.id','products.name', DB::raw('COUNT(orders.id) as total'))
-            ->leftJoin('orders','products.id','=','orders.product_id')
-            ->leftJoin('assignments','orders.id','=','assignments.order_id')
-            ->where('assignments.status','accepted')
-            ->whereYear('assignments.assigned_at',$year)
-            ->groupBy('products.id','products.name')
+        // Product usage (by accepted assignments)
+        $productUsage = Product::select(
+                'products.id',
+                'products.name',
+                DB::raw('COUNT(orders.id) as total')
+            )
+            ->leftJoin('orders', 'products.id', '=', 'orders.product_id')
+            ->leftJoin('assignments', 'orders.id', '=', 'assignments.order_id')
+            ->where('assignments.status', 'accepted')
+            ->whereYear('assignments.assigned_at', $year)
+            ->groupBy('products.id', 'products.name')
             ->get();
 
-        $assignmentsByStatusQuery = Assignment::select('status', DB::raw('count(*) as total'))
-            ->when($year, fn($q) => $q->whereYear('assigned_at', $year))
-            ->when($month, fn($q) => $month ? $q->whereMonth('assigned_at', $month) : $q)
+        // Assignment by status (filter opsional bulan)
+        $assignmentsByStatus = Assignment::select('status', DB::raw('count(*) as total'))
+            ->when($year, function ($q) use ($year) {
+                $q->whereYear('assigned_at', $year);
+            })
+            ->when($month, function ($q) use ($month) {
+                if ($month) {
+                    $q->whereMonth('assigned_at', $month);
+                }
+            })
             ->groupBy('status')
             ->get()
-            ->pluck('total','status')
+            ->pluck('total', 'status')
             ->toArray();
 
-        return view('reports.index', [
-            'year'=>$year,
-            'month'=>$month,
-            'ordersPerMonth'=>$ordersPerMonth,
-            'acceptedPerMonth'=>$acceptedPerMonth,
-            'productUsage'=>$productUsage,
-            'assignmentsByStatus'=>$assignmentsByStatusQuery
-        ]);
+        return view('reports.admin', compact(
+            'year',
+            'month',
+            'ordersPerMonth',
+            'acceptedPerMonth',
+            'productUsage',
+            'assignmentsByStatus'
+        ));
     }
 
-    // Excel export (uses chunked export for safety)
+    // ========================================================================
+    // 🔹 LAPORAN PRIBADI (Driver/Guide)
+    // ========================================================================
+
+    private function personalReport(Request $request)
+    {
+        $user = Auth::user();
+
+        // Default: bulan ini
+        $start = $request->filled('start')
+            ? Carbon::parse($request->start)->startOfDay()
+            : now()->startOfMonth();
+
+        $end = $request->filled('end')
+            ? Carbon::parse($request->end)->endOfDay()
+            : now()->endOfMonth();
+
+        // Query assignment milik user
+        $query = Assignment::with(['order.product', 'order'])
+            ->where(function ($q) use ($user) {
+                if ($user->role === 'driver') {
+                    $q->where('driver_id', $user->id);
+                } elseif ($user->role === 'guide') {
+                    $q->where('guide_id', $user->id);
+                }
+            })
+            ->whereBetween('assigned_at', [$start, $end]);
+
+        // Filter status (opsional)
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $assignments = $query->orderBy('assigned_at', 'desc')->get();
+
+        // Summary
+        $summary = [
+            'total'     => $assignments->count(),
+            'completed' => $assignments->where('status', 'completed')->count(),
+            'accepted'  => $assignments->where('status', 'accepted')->count(),
+            'pending'   => $assignments->where('status', 'pending')->count(),
+            'declined'  => $assignments->where('status', 'declined')->count(),
+        ];
+
+        // Hitung jam kerja dari assignment completed
+        $completedAssignments = $assignments->where('status', 'completed');
+
+        $usedMinutes = 0;
+        foreach ($completedAssignments as $a) {
+            if ($a->workstart && $a->workend) {
+                $usedMinutes += Carbon::parse($a->workstart)
+                    ->diffInMinutes(Carbon::parse($a->workend));
+            }
+        }
+
+        $usedHours   = round($usedMinutes / 60, 1);
+        $totalHours  = $user->monthly_work_limit ?? 200;
+        $usagePercent = $totalHours > 0
+            ? min(100, round(($usedHours / $totalHours) * 100))
+            : 0;
+
+        // Data chart: per hari (total vs completed)
+        $chartData = $assignments
+            ->groupBy(function ($item) {
+                return Carbon::parse($item->assigned_at)->format('Y-m-d');
+            })
+            ->map(function ($day, $date) {
+                return [
+                    'date'      => $date,
+                    'completed' => $day->where('status', 'completed')->count(),
+                    'total'     => $day->count(),
+                ];
+            })
+            ->values()
+            ->toArray();
+
+        return view('reports.personal', compact(
+            'assignments',
+            'summary',
+            'chartData',
+            'start',
+            'end',
+            'user',
+            'usedHours',
+            'totalHours',
+            'usagePercent'
+        ));
+    }
+
+    // ========================================================================
+    // 🔹 EXPORT - ADMIN
+    // ========================================================================
+
     public function exportExcel(Request $request)
     {
-        $this->authorizeExport(); // helper check (defined below) - optional
+        $this->authorizeExport();
 
         $year = $request->query('year', date('Y'));
         $month = $request->query('month', null);
-
         $fileName = "orders_{$year}" . ($month ? "_{$month}" : "") . ".xlsx";
 
-        // Use chunked query-based export to handle large datasets
         return Excel::download(new OrdersQueryExport($year, $month), $fileName);
     }
 
-    // PDF export
     public function exportPdf(Request $request)
     {
         $this->authorizeExport();
@@ -92,22 +226,137 @@ class ReportController extends Controller
         $month = $request->query('month', null);
 
         $orders = Order::with('product')
-            ->when($year, fn($q) => $q->whereYear('pickup_time',$year))
-            ->when($month, fn($q) => $q->whereMonth('pickup_time',$month))
-            ->orderBy('pickup_time','desc')
+            ->when($year, function ($q) use ($year) {
+                $q->whereYear('pickup_time', $year);
+            })
+            ->when($month, function ($q) use ($month) {
+                if ($month) {
+                    $q->whereMonth('pickup_time', $month);
+                }
+            })
+            ->orderBy('pickup_time', 'desc')
             ->get();
 
-        $pdf = Pdf::loadView('reports.pdf_orders', compact('orders','year','month'))->setPaper('a4','portrait');
+        $pdf = Pdf::loadView('reports.pdf_orders', compact('orders', 'year', 'month'))
+            ->setPaper('a4', 'portrait');
 
         $fileName = "orders_report_{$year}" . ($month ? "_{$month}" : "") . ".pdf";
         return $pdf->download($fileName);
     }
 
-    // optional simple role guard - adjust to your app roles
+    // ========================================================================
+    // 🔹 EXPORT - DRIVER/GUIDE
+    // ========================================================================
+
+    public function exportPersonalPdf(Request $request)
+    {
+        $user = Auth::user();
+        abort_unless(in_array($user->role, ['driver', 'guide']), 403);
+
+        $start = Carbon::parse($request->start ?? now()->startOfMonth());
+        $end   = Carbon::parse($request->end ?? now()->endOfMonth());
+
+        $assignments = Assignment::with(['order', 'order.product'])
+            ->where(function ($q) use ($user) {
+                if ($user->role === 'driver') {
+                    $q->where('driver_id', $user->id);
+                }
+                if ($user->role === 'guide') {
+                    $q->where('guide_id', $user->id);
+                }
+            })
+            ->whereBetween('assigned_at', [$start, $end])
+            ->orderBy('assigned_at', 'desc')
+            ->get();
+
+        $summary = [
+            'total'     => $assignments->count(),
+            'completed' => $assignments->where('status', 'completed')->count(),
+        ];
+
+        $pdf = Pdf::loadView('reports.pdf_personal', compact(
+                'assignments',
+                'summary',
+                'user',
+                'start',
+                'end'
+            ))
+            ->setPaper('a4', 'portrait');
+
+        $fileName = "laporan-{$user->role}-{$user->name}_{$start->format('Y-m-d')}_{$end->format('Y-m-d')}.pdf";
+        return $pdf->download($fileName);
+    }
+
+    public function exportPersonalExcel(Request $request)
+    {
+        $user = Auth::user();
+        abort_unless(in_array($user->role, ['driver', 'guide']), 403);
+
+        $start = Carbon::parse($request->start ?? now()->startOfMonth());
+        $end   = Carbon::parse($request->end ?? now()->endOfMonth());
+
+        $assignments = Assignment::with(['order', 'order.product'])
+            ->where(function ($q) use ($user) {
+                if ($user->role === 'driver') {
+                    $q->where('driver_id', $user->id);
+                }
+                if ($user->role === 'guide') {
+                    $q->where('guide_id', $user->id);
+                }
+            })
+            ->whereBetween('assigned_at', [$start, $end])
+            ->orderBy('assigned_at', 'desc')
+            ->get();
+
+        $headers = ['ID', 'Customer', 'Product', 'Pickup', 'Status', 'Durasi (Menit)', 'Catatan'];
+        $rows = [];
+
+        foreach ($assignments as $a) {
+            $order = $a->order;
+            $pickup = $order && $order->pickup_time
+                ? Carbon::parse($order->pickup_time)->format('d M Y H:i')
+                : '-';
+
+            $duration = '-';
+            if ($a->workstart && $a->workend) {
+                $duration = Carbon::parse($a->workstart)
+                    ->diffInMinutes(Carbon::parse($a->workend));
+            }
+
+            $rows[] = [
+                $a->id,
+                $order?->customer_name ?? '-',
+                $order?->product?->name ?? '-',
+                $pickup,
+                ucfirst($a->status),
+                $duration,
+                $a->note ?? '-',
+            ];
+        }
+
+        $callback = function () use ($headers, $rows) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $headers);
+            foreach ($rows as $row) {
+                fputcsv($file, $row);
+            }
+            fclose($file);
+        };
+
+        $filename = "laporan-{$user->role}-{$user->name}_{$start->format('Y-m-d')}_{$end->format('Y-m-d')}.csv";
+        return response()->streamDownload($callback, $filename, ['Content-Type' => 'text/csv']);
+    }
+
+    // ========================================================================
+    // 🔹 HELPER
+    // ========================================================================
+
     protected function authorizeExport()
     {
-        // if you want, check current user role here and abort(403) if not allowed
-        // e.g. if (!auth()->user() || !in_array(auth()->user()->role, ['super_admin','admin'])) abort(403);
+        $user = Auth::user();
+        if (!$user || !in_array($user->role, ['admin', 'super_admin', 'staff'])) {
+            abort(403, 'Akses ditolak.');
+        }
         return true;
     }
 }

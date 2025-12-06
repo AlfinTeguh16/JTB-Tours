@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="csrf-token" content="{{ csrf_token() }}" />
   <title>@yield('title', 'Dashboard')</title>
+  @vite('resources/css/style.css')
 
   <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2"></script>
 
-  {{-- Load CSS via Vite (recommended). Jika tidak menggunakan Vite, gantikan dengan link CSS Anda --}}
   @if(app()->environment('local'))
     {{-- In local you may run vite dev server --}}
     @vite('resources/css/app.css')

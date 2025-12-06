@@ -17,18 +17,40 @@ class WorkScheduleController extends Controller
         $year  = (int) $request->query('year', now()->year);
         $month = (int) $request->query('month', now()->month);
 
-        // Get all drivers and guides
         $users = User::whereIn('role', ['driver','guide'])
             ->orderBy('role')
             ->orderBy('name')
             ->get();
 
-        // Eager load schedules for this month for those users
-        $schedules = WorkSchedule::whereIn('user_id', $users->pluck('id')->toArray())
+        $existingScheduleUserIds = WorkSchedule::where('year', $year)
+            ->where('month', $month)
+            ->pluck('user_id')
+            ->toArray();
+
+        $missingUsers = $users->whereNotIn('id', $existingScheduleUserIds);
+
+        // Auto-generate jika ada user tanpa jadwal bulan ini
+        if ($missingUsers->isNotEmpty()) {
+            DB::transaction(function () use ($missingUsers, $year, $month) {
+                foreach ($missingUsers as $user) {
+                    WorkSchedule::create([
+                        'user_id'     => $user->id,
+                        'year'        => $year,
+                        'month'       => $month,
+                        'total_hours' => $user->monthly_work_limit ?? 200,
+                        'used_hours'  => 0, // fresh month → 0
+                    ]);
+                }
+            });
+        }
+
+        // Lanjutkan seperti biasa
+        $schedules = WorkSchedule::whereIn('user_id', $users->pluck('id'))
             ->where('month', $month)
             ->where('year', $year)
             ->get()
             ->keyBy('user_id');
+
 
         $perPage = 15; // ganti sesuai kebutuhan
         $workSchedules = WorkSchedule::query()
@@ -59,22 +81,13 @@ class WorkScheduleController extends Controller
         DB::transaction(function() use ($users, $year, $month) {
             foreach ($users as $user) {
                 WorkSchedule::updateOrCreate(
-                    ['user_id'=>$user->id,'month'=>$month,'year'=>$year],
+                    ['user_id' => $user->id, 'month' => $month, 'year' => $year],
                     [
                         'total_hours' => $user->monthly_work_limit ?? 200,
-                        // keep used_hours if exists else set to current used_hours from user model or 0
-                        'used_hours' => function ($ws) use ($user) {
-                            // this closure isn't executed by updateOrCreate; we'll set below if needed
-                            return $user->used_hours ?? 0;
-                        }
+                        // Jangan set used_hours di sini — biarkan scheduler yang handle awal bulan
+                        // Jika record sudah ada, Laravel tidak overwrite used_hours karena tidak diisi
                     ]
                 );
-                // after updateOrCreate, ensure used_hours not overwritten incorrectly:
-                $ws = WorkSchedule::firstWhere(['user_id'=>$user->id,'month'=>$month,'year'=>$year]);
-                if ($ws && ($ws->used_hours === null)) {
-                    $ws->used_hours = $user->used_hours ?? 0;
-                    $ws->save();
-                }
             }
         });
 

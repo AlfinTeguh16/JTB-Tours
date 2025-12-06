@@ -16,6 +16,7 @@ return new class extends Migration
             $table->enum('role', ['super_admin','admin','staff','driver','guide'])->default('staff');
             $table->string('email')->unique();
             $table->string('phone')->nullable();
+            $table->string('profile_photo')->nullable();
             $table->date('join_date')->nullable();
             $table->string('password');
             $table->integer('monthly_work_limit')->default(200); // jam limit per bulan
@@ -30,6 +31,7 @@ return new class extends Migration
             $table->string('name');
             $table->integer('capacity')->default(4);
             $table->text('description')->nullable();
+            $table->decimal('hour', 10, 2)->default(0);
             $table->timestamps();
         });
 

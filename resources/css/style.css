@@ -1,0 +1,52 @@
+/* Global Form Styles - Cleaner & More Modern */
+input,
+textarea,
+select {
+    width: 100%;
+    border: 2px solid #d1d5db !important; 
+    border-radius: 8px !important;
+    padding: 8px 10px !important;
+    padding-right: 2.5rem !important;
+    font-size: 0.95rem;
+    background-color: #ffffff;
+    transition: all 0.2s ease-in-out !important;
+    appearance: none; 
+    background-image: url("data:image/svg+xml;utf8,<svg fill='%239ca3af' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem;
+}
+
+/* Hover effect */
+input:hover,
+textarea:hover,
+select:hover {
+    border-color: #9ca3af !important;
+}
+
+/* Focus effect */
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
+    outline: none !important;
+}
+
+/* Placeholder styling */
+input::placeholder,
+textarea::placeholder {
+    color: #9ca3af;
+    opacity: 1;
+}
+
+/* Disabled state */
+input:disabled,
+textarea:disabled,
+select:disabled {
+    background-color: #f3f4f6 !important; 
+    color: #9ca3af !important;
+    cursor: not-allowed;
+}
+
+

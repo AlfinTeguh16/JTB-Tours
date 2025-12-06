@@ -11,6 +11,7 @@ use App\Http\Controllers\AvailabilityController;
 use App\Http\Controllers\WorkScheduleController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ProfileController;
 
 /*
 |--------------------------------------------------------------------------
@@ -40,9 +41,35 @@ Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 /*
  * Dashboard (protected) - controller will choose view based on role
  */
-Route::get('/dashboard', [DashboardController::class, 'index'])
-    ->middleware('auth')
-    ->name('dashboard');
+Route::middleware(['auth'])->group(function () {
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->name('dashboard');
+    Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
+});
+
+Route::prefix('dashboard')->middleware(['auth'])->group(function () {
+
+    // Admin & staff
+    Route::get('/admin', [DashboardController::class, 'adminIndex'])
+        ->middleware('role:admin,super_admin,staff')
+        ->name('dashboard.admin');
+
+    // Driver
+    Route::get('/driver', [DashboardController::class, 'driverGuideIndex'])
+        ->middleware('role:driver')
+        ->name('dashboard.driver');
+
+    // Guide
+    Route::get('/guide', [DashboardController::class, 'driverGuideIndex'])
+        ->middleware('role:guide')
+        ->name('dashboard.guide');
+
+    // Fallback: redirect URL tidak dikenal ke /dashboard
+    Route::get('/{any?}', function () {
+        return redirect()->route('dashboard');
+    })->where('any', '.*')->name('dashboard.fallback');
+});
 
 /*
  * Protected routes (require authentication)
@@ -73,7 +100,7 @@ Route::middleware(['auth'])->group(function () {
     /*
      * Orders (super_admin, admin)
      */
-    Route::middleware(['role:super_admin,admin'])->group(function () {
+    Route::middleware(['role:super_admin,admin,staff'])->group(function () {
         Route::resource('orders', OrderController::class);
     });
 
@@ -126,15 +153,33 @@ Route::middleware(['auth'])->group(function () {
         Route::put('work-schedules/{workSchedule}', [WorkScheduleController::class, 'update'])->name('work-schedules.update');
     });
 
-    /*
-     * Reports & Exports (super_admin, admin)
-     */
-    Route::middleware(['role:super_admin,admin'])->group(function () {
-        Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
-        Route::get('reports/export/excel', [ReportController::class, 'exportExcel'])->name('reports.export.excel');
-        Route::get('reports/export/pdf', [ReportController::class, 'exportPdf'])->name('reports.export.pdf');
-        Route::get('reports/{report}', [ReportController::class, 'show'])->name('reports.show');
+
+
+    Route::middleware(['auth'])->group(function () {
+
+        Route::get('reports', [ReportController::class, 'index'])
+            ->name('reports.index');
+    
+        // Export laporan sistem (admin/staff)
+        Route::middleware(['role:super_admin,admin,staff'])->group(function () {
+            Route::get('reports/export/excel', [ReportController::class, 'exportExcel'])
+                ->name('reports.export.excel');
+    
+            Route::get('reports/export/pdf', [ReportController::class, 'exportPdf'])
+                ->name('reports.export.pdf');
+        });
+    
+        // Export laporan pribadi (driver/guide)
+        Route::middleware(['role:driver,guide'])->group(function () {
+            Route::get('reports/personal/export/pdf', [ReportController::class, 'exportPersonalPdf'])
+                ->name('reports.personal.export.pdf');
+    
+            Route::get('reports/personal/export/excel', [ReportController::class, 'exportPersonalExcel'])
+                ->name('reports.personal.export.excel');
+        });
+    
     });
+
 
 });
 
