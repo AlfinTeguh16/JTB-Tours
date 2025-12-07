@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Models\Assignment;
 use App\Models\WorkSchedule;
+use App\Models\Order;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -27,12 +28,12 @@ class DashboardController extends Controller
         }
     }
 
-    // ===== ADMIN DASHBOARD =====
+    // ===== ADMIN / STAFF DASHBOARD =====
     private function adminIndex(Request $request)
     {
         try {
-            $now = Carbon::now();
-            $year = (int) $request->query('year', $now->year);
+            $now   = Carbon::now();
+            $year  = (int) $request->query('year', $now->year);
             $month = (int) $request->query('month', $now->month);
 
             $startOfMonth = Carbon::create($year, $month, 1)->startOfMonth();
@@ -48,6 +49,11 @@ class DashboardController extends Controller
             $topDrivers           = $this->getTopDriversThisMonth($year, $month);
             $availableYears       = $this->getAvailableYears();
 
+// order notifikasi
+            $lastOrderId = Schema::hasTable('orders')
+                ? (Order::max('id') ?? 0)
+                : 0;
+
             return view('dashboard.admin', compact(
                 'ordersThisMonth',
                 'assignedThisMonth',
@@ -58,7 +64,8 @@ class DashboardController extends Controller
                 'topDrivers',
                 'month',
                 'year',
-                'availableYears'
+                'availableYears',
+                'lastOrderId'   // <-- dikirim ke Blade
             ));
         } catch (\Throwable $e) {
             Log::error('Admin dashboard error: ' . $e->getMessage(), [
@@ -111,15 +118,15 @@ class DashboardController extends Controller
 
     private function getMonthlyOrdersLast12Months(Carbon $now): array
     {
-        $ordersExist = Schema::hasTable('orders');
+        $ordersExist      = Schema::hasTable('orders');
         $assignmentsExist = Schema::hasTable('assignments');
 
         $monthlyData = [];
 
         for ($i = 11; $i >= 0; $i--) {
-            $dt = $now->copy()->subMonths($i);
+            $dt    = $now->copy()->subMonths($i);
             $start = $dt->copy()->startOfMonth()->toDateTimeString();
-            $end = $dt->copy()->endOfMonth()->toDateTimeString();
+            $end   = $dt->copy()->endOfMonth()->toDateTimeString();
 
             $orderCount = $ordersExist
                 ? DB::table('orders')
@@ -156,13 +163,13 @@ class DashboardController extends Controller
             ->groupBy('product_id')
             ->get();
 
-        $distribution = [];
+        $distribution  = [];
         $productsExist = Schema::hasTable('products');
 
         foreach ($rows as $r) {
             $label = 'Unknown Product';
             if ($productsExist && $r->product_id) {
-                $prod = DB::table('products')->where('id', $r->product_id)->first();
+                $prod  = DB::table('products')->where('id', $r->product_id)->first();
                 $label = $prod?->name ?? $label;
             }
 
@@ -218,7 +225,7 @@ class DashboardController extends Controller
             ->select(DB::raw('DISTINCT YEAR(pickup_time) as year'))
             ->orderByDesc('year')
             ->pluck('year')
-            ->map(fn($y) => (int) $y)
+            ->map(fn ($y) => (int) $y)
             ->toArray();
     }
 
@@ -231,15 +238,14 @@ class DashboardController extends Controller
             $now = Carbon::now();
 
             // Tahun untuk chart + filter
-            $year = (int) $request->query('year', $now->year);
-
-            // Bulan untuk card (opsional, kalau mau nanti bisa tambahkan filter bulan)
+            $year  = (int) $request->query('year', $now->year);
+            // Bulan untuk card
             $month = (int) $request->query('month', $now->month);
 
             $startOfMonth = Carbon::create($year, $month, 1)->startOfMonth();
             $endOfMonth   = Carbon::create($year, $month, 1)->endOfMonth();
 
-            // Query dasar assignment milik user
+            // Query assignment milik user
             $baseQuery = Assignment::where(function ($q) use ($user) {
                 $q->where('driver_id', $user->id)
                   ->orWhere('guide_id', $user->id);
@@ -250,7 +256,7 @@ class DashboardController extends Controller
                 ->whereBetween('assigned_at', [$startOfMonth, $endOfMonth])
                 ->count();
 
-            // Assignment completed bulan ini untuk hitung jam
+            // Assignment completed bulan ini
             $completedAssignments = (clone $baseQuery)
                 ->whereBetween('assigned_at', [$startOfMonth, $endOfMonth])
                 ->where('status', 'completed')
@@ -263,10 +269,9 @@ class DashboardController extends Controller
                         ->diffInMinutes(Carbon::parse($a->workend));
                 }
             }
-
             $usedHours = round($usedMinutes / 60, 1);
 
-            // Ambil work schedule untuk batas jam (kalau ada)
+            // Work schedule untuk batas jam
             $workSchedule = WorkSchedule::where('user_id', $user->id)
                 ->where('month', $month)
                 ->where('year', $year)
@@ -286,12 +291,14 @@ class DashboardController extends Controller
                 ->limit(5)
                 ->get();
 
-            // Total tugas completed bulan ini (untuk card)
             $completedThisMonth = $completedAssignments->count();
 
-            // ===== CHART: Completed assignments per month (1 tahun) =====
+            // Chart: completed per bulan (tahun berjalan)
             $completedPerMonthRaw = (clone $baseQuery)
-                ->select(DB::raw('MONTH(assigned_at) as month'), DB::raw('COUNT(*) as total'))
+                ->select(
+                    DB::raw('MONTH(assigned_at) as month'),
+                    DB::raw('COUNT(*) as total')
+                )
                 ->whereYear('assigned_at', $year)
                 ->where('status', 'completed')
                 ->groupBy(DB::raw('MONTH(assigned_at)'))
@@ -308,7 +315,7 @@ class DashboardController extends Controller
                 ];
             }
 
-            // Tahun-tahun yang tersedia untuk filter (berdasarkan assignments user ini)
+            // Tahun-tahun yang tersedia untuk filter
             if (!Schema::hasTable('assignments')) {
                 $availableYears = [$now->year];
             } else {
@@ -320,7 +327,7 @@ class DashboardController extends Controller
                     ->select(DB::raw('DISTINCT YEAR(assigned_at) as year'))
                     ->orderByDesc('year')
                     ->pluck('year')
-                    ->map(fn($y) => (int) $y)
+                    ->map(fn ($y) => (int) $y)
                     ->toArray();
 
                 if (empty($availableYears)) {
@@ -340,7 +347,6 @@ class DashboardController extends Controller
                 'completedPerMonth',
                 'availableYears'
             ));
-
         } catch (\Throwable $e) {
             Log::error('Driver/Guide dashboard error: ' . $e->getMessage(), [
                 'user_id' => $user?->id,

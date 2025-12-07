@@ -1,18 +1,19 @@
 @extends('layouts.app')
-@section('title', 'Dashboard - Admin')
+@section('title', 'Dashboard ')
 
 @section('content')
 @php
-    $ordersThisMonth = $ordersThisMonth ?? 0;
-    $assignedThisMonth = $assignedThisMonth ?? 0;
-    $completedThisMonth = $completedThisMonth ?? 0;
-    $activeDrivers = $activeDrivers ?? 0;
-    $monthlyOrders = $monthlyOrders ?? [];
+    $ordersThisMonth     = $ordersThisMonth     ?? 0;
+    $assignedThisMonth   = $assignedThisMonth   ?? 0;
+    $completedThisMonth  = $completedThisMonth  ?? 0;
+    $activeDrivers       = $activeDrivers       ?? 0;
+    $monthlyOrders       = $monthlyOrders       ?? [];
     $productDistribution = $productDistribution ?? [];
-    $topDrivers = $topDrivers ?? [];
-    $month = $month ?? now()->month;
-    $year = $year ?? now()->year;
-    $availableYears = $availableYears ?? [now()->year];
+    $topDrivers          = $topDrivers          ?? [];
+    $month               = $month               ?? now()->month;
+    $year                = $year                ?? now()->year;
+    $availableYears      = $availableYears      ?? [now()->year];
+    $lastOrderId         = $lastOrderId         ?? 0;  // 🔔 untuk notifikasi staff
 @endphp
 
 <div class="bg-gray-50 min-h-screen">
@@ -317,5 +318,77 @@
     }
   });
 </script>
+
+{{-- 🔔 Notifikasi order baru: HANYA untuk STAFF --}}
+@if(auth()->check() && auth()->user()->role === 'staff')
+<script>
+  (function () {
+    let lastOrderId = {{ (int) $lastOrderId }};
+
+    function requestNotificationPermission() {
+      if (!('Notification' in window)) {
+        console.warn('Browser tidak mendukung Notification API.');
+        return;
+      }
+
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then(function (result) {
+          console.log('Notification permission:', result);
+        });
+      }
+    }
+
+    function showOrderNotification(order) {
+      if (!('Notification' in window)) {
+        alert('Order baru #' + order.id + ' dari ' + (order.customer_name || '-'));
+        return;
+      }
+
+      if (Notification.permission !== 'granted') {
+        // fallback kalau user belum kasih izin
+        alert('Order baru #' + order.id + ' dari ' + (order.customer_name || '-'));
+        return;
+      }
+
+      const title = 'Order Baru #' + order.id;
+      const body  =
+        (order.customer_name ? 'Customer: ' + order.customer_name + '\n' : '') +
+        (order.pickup_time   ? 'Pickup: '   + order.pickup_time : '');
+
+      const notification = new Notification(title, {
+        body: body,
+        icon: '/favicon.ico', 
+      });
+
+      notification.onclick = function () {
+        window.focus();
+        window.location.href = "{{ route('orders.index') }}";
+      };
+    }
+
+    function checkNewOrders() {
+      fetch("{{ route('orders.check-latest') }}?after_id=" + lastOrderId, {
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+        .then(response => response.json())
+        .then(data => {
+          if (data.has_new && data.order) {
+            lastOrderId = data.order.id;
+            showOrderNotification(data.order);
+          }
+        })
+        .catch(err => {
+          console.error('Error checking new orders:', err);
+        });
+    }
+
+    requestNotificationPermission();
+    // cek tiap 15 detik
+    setInterval(checkNewOrders, 15000);
+  })();
+</script>
+@endif
 @endpush
 @endsection
