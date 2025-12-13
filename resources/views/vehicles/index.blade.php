@@ -76,7 +76,7 @@
               {{-- Use raw (already escaped) JSON to call JS function safely --}}
               <button onclick="openVehicleModal({!! $payloadJson !!})" class="px-2 py-1 bg-indigo-600 text-white rounded text-xs">Detail</button>
 
-              <a href="{{ route('vehicles.edit', $v) }}" class="px-2 py-1 ml-1 bg-yellow-400 text-white rounded text-xs">Edit</a>
+              <x-edit-button :href="route('vehicles.edit', $v)">Edit</x-edit-button>
 
               <form action="{{ route('vehicles.destroy', $v) }}" method="POST" class="inline-block" onsubmit="return confirm('Hapus kendaraan?')">
                 @csrf @method('DELETE')
@@ -101,7 +101,7 @@
   <div class="fixed inset-0 bg-black/40" @click="close()"></div>
   <div class="bg-white rounded shadow-lg max-w-lg w-full p-4 z-50">
     <div class="flex items-start justify-between">
-      <h3 class="text-lg font-medium">Vehicle #<span x-text="payload.id"></span> — <span x-text="payload.brand"></span></h3>
+      <h3 class="text-lg font-medium">Vehicle — <span x-text="payload.brand"></span></h3>
       <button @click="close()" class="text-gray-500">✕</button>
     </div>
 

@@ -13,13 +13,21 @@ class Assignment extends Model
         'guide_id',
         'assigned_by',
         'status',
+        'vehicle_id',
+        'rejection_reason',
+        'rejected_at',
         'workstart',
         'workend',
         'assigned_at',
+        'started_at',
+        'completed_at',
     ];
 
     protected $casts = [
         'assigned_at' => 'datetime',
+        'started_at' => 'datetime',
+        'completed_at' => 'datetime',
+        'rejected_at' => 'datetime',
     ];
 
     public function order(): BelongsTo
@@ -35,6 +43,11 @@ class Assignment extends Model
     public function guide(): BelongsTo
     {
         return $this->belongsTo(User::class, 'guide_id');
+    }
+
+    public function vehicle()
+    {
+        return $this->belongsTo(Vehicle::class);
     }
 
     public function assignedBy(): BelongsTo

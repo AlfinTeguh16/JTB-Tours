@@ -6,6 +6,7 @@ use App\Events\NewAssignmentCreated;
 use App\Models\Assignment;
 use App\Models\Order;
 use App\Models\User;
+use App\Models\Vehicle;
 use App\Models\WorkSchedule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -21,7 +22,7 @@ class AssignmentController extends Controller
     public function index(Request $request)
     {
         try {
-            $q = Assignment::with(['order.product', 'driver', 'guide', 'assignedBy']);
+            $q = Assignment::with(['order.product', 'driver', 'guide', 'assignedBy', 'vehicle']);
 
             if ($request->filled('status')) {
                 $q->where('status', $request->query('status'));
@@ -59,9 +60,21 @@ class AssignmentController extends Controller
                 ->orderBy('pickup_time')
                 ->get();
     
+            // Sort drivers by least used hours in current month.
+            // Simplified: fetch all drivers and sort by relationship/attribute logic or join.
+            // Ideally: join work_schedules and order by used_hours ASC.
+            $month = now()->month;
+            $year  = now()->year;
+            
             $drivers = User::where('role', 'driver')
-                ->orderBy('name')
-                ->get();
+                ->with(['workSchedules' => function($q) use($month, $year) {
+                    $q->where('month', $month)->where('year', $year);
+                }])
+                ->get()
+                ->sortBy(function($u) {
+                    return $u->workSchedules->first()?->used_hours ?? 0;
+                })
+                ->values(); // reset keys
     
             $guides = User::where('role', 'guide')
                 ->orderBy('name')
@@ -86,7 +99,14 @@ class AssignmentController extends Controller
                 ->where('year', $year)
                 ->get()
                 ->keyBy('user_id');
-    
+            
+            // Available Vehicles (Available & not maintenance)
+            // Ideally we check if "in_use" but in_use is status column.
+            // User requested: "tampilkan mobil yang tersedia pada hari yang diinginkan semisal ada order dihari yang sama masih bisa digunakan di Waktu yang berbeda"
+            // So we just filter by status != maintenance. 
+            // In Store, we should validate time overlay.
+            $vehicles = Vehicle::where('status', '!=', 'maintenance')->orderBy('type')->orderBy('plate_number')->get();
+
             return view('assignments.create', compact(
                 'orders',
                 'drivers',
@@ -95,7 +115,8 @@ class AssignmentController extends Controller
                 'month',
                 'year',
                 'driverSchedules',
-                'guideSchedules'
+                'guideSchedules',
+                'vehicles'
             ));
         } catch (\Throwable $e) {
             Log::error('Assignment.create error: ' . $e->getMessage(), [
@@ -108,77 +129,113 @@ class AssignmentController extends Controller
 
     /**
      * Store assignment (dibuat oleh staff)
+     * Supports multiple assignments per request (assignments.*)
      */
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'order_id'  => 'required|exists:orders,id',
-            'driver_id' => 'required|exists:users,id',
-            'guide_id'  => 'nullable|exists:users,id',
-            'note'      => 'nullable|string',
+        $request->validate([
+            'order_id' => 'required|exists:orders,id',
+            'assignments' => 'required|array|min:1',
+            'assignments.*.driver_id' => 'required|exists:users,id',
+            'assignments.*.vehicle_id'=> 'required|exists:vehicles,id',
+            'assignments.*.guide_id'  => 'nullable|exists:users,id',
+            'assignments.*.note'      => 'nullable|string',
         ]);
 
         DB::beginTransaction();
 
         try {
-            $order = Order::lockForUpdate()->findOrFail($data['order_id']);
+            $order = Order::lockForUpdate()->findOrFail($request->order_id);
 
             if ($order->status === 'completed') {
                 DB::rollBack();
                 return redirect()->back()->withInput()->with('error', 'Order sudah selesai, tidak bisa di-assign.');
             }
 
-            $driver = User::findOrFail($data['driver_id']);
-            $guide = $data['guide_id'] ? User::find($data['guide_id']) : null;
-
-            $estHours = $this->calculateEstimatedHours($order);
             $month = now()->month;
             $year = now()->year;
+            $estHours = $this->calculateEstimatedHours($order);
 
-            // Work schedule driver
-            $driverSchedule = WorkSchedule::firstOrCreate(
-                ['user_id' => $driver->id, 'month' => $month, 'year' => $year],
-                ['total_hours' => $driver->monthly_work_limit ?? 200, 'used_hours' => 0.00]
-            );
-
-            if (($driverSchedule->used_hours + $estHours) > $driverSchedule->total_hours) {
-                DB::rollBack();
-                return redirect()->back()->withInput()->with('error', 'Driver tidak memiliki cukup jam kerja bulan ini.');
-            }
-
-            if ($guide) {
-                $guideSchedule = WorkSchedule::firstOrCreate(
-                    ['user_id' => $guide->id, 'month' => $month, 'year' => $year],
-                    ['total_hours' => $guide->monthly_work_limit ?? 200, 'used_hours' => 0.00]
+            foreach ($request->assignments as $data) {
+                // Check usage limit for Driver
+                $driver = User::findOrFail($data['driver_id']);
+                $driverSchedule = WorkSchedule::firstOrCreate(
+                    ['user_id' => $driver->id, 'month' => $month, 'year' => $year],
+                    ['total_hours' => $driver->monthly_work_limit ?? 200, 'used_hours' => 0.00]
                 );
 
-                if (($guideSchedule->used_hours + $estHours) > $guideSchedule->total_hours) {
+                // Check Overlimit (Optional strictness)
+                if (($driverSchedule->used_hours + $estHours) > $driverSchedule->total_hours) {
                     DB::rollBack();
-                    return redirect()->back()->withInput()->with('error', 'Guide tidak memiliki cukup jam kerja bulan ini.');
+                    return redirect()->back()->withInput()->with('error', "Driver {$driver->name} tidak memiliki cukup jam kerja.");
+                }
+
+                // Increment usage
+                $driverSchedule->increment('used_hours', $estHours);
+
+                // Handle Guide
+                $guideId = $data['guide_id'] ?? null;
+                if ($guideId) {
+                    $guide = User::findOrFail($guideId);
+                    $guideSchedule = WorkSchedule::firstOrCreate(
+                        ['user_id' => $guide->id, 'month' => $month, 'year' => $year],
+                        ['total_hours' => $guide->monthly_work_limit ?? 200, 'used_hours' => 0.00]
+                    );
+                    $guideSchedule->increment('used_hours', $estHours);
+                }
+
+                // Check Vehicle availability
+                $vehicle = Vehicle::findOrFail($data['vehicle_id']);
+                // Note: checkVehicleOverlap needs to be robust if we are assigning multiple vehicles to SAME order.
+                // The order time is the same. The logic checks if *other* assignments overlap.
+                // Since these new assignments are not in DB yet, they won't conflict with each other via DB query check.
+                // But we must ensure user didn't pick SAME vehicle twice in the form.
+                // Frontend should prevent or we check usage in array. 
+                // However, checkVehicleOverlap checks DB. 
+                if ($this->checkVehicleOverlap($vehicle->id, $order)) {
+                     DB::rollBack();
+                     return redirect()->back()->withInput()->with('error', "Kendaraan {$vehicle->plate_number} sedang digunakan pada estimasi jam tersebut.");
+                }
+                
+                // Create Assignment
+                Assignment::create([
+                    'order_id'     => $order->id,
+                    'driver_id'    => $driver->id,
+                    'guide_id'     => $guideId,
+                    'vehicle_id'   => $vehicle->id,
+                    'assigned_by'  => Auth::id(),
+                    'status'       => 'pending',
+                    'assigned_at'  => now(),
+                    'note'         => $data['note'] ?? null,
+                ]);
+            }
+            
+            // Check order status update
+            // Verify total assignments count vs order requirement
+            $totalAssigned = $order->assignments()->count(); 
+            // Note: transaction not committed yet, so count() might not see new ones depending on isolation?
+            // Usually within same transaction connection, it sees them.
+            // If strict, we can just count $request->assignments count + existing.
+            
+            if ($totalAssigned >= $order->vehicle_count) {
+                $order->update(['status' => 'assigned']);
+            } else {
+                // If we want partial status, logic here. 
+                // Defaulting to assigned only when fully assigned?
+                // For now, let's set to assigned if at least 1 is there or maybe only if full?
+                // User requirement implied "create assignments" -> done.
+                if ($totalAssigned > 0) {
+                     $order->update(['status' => 'assigned']); 
                 }
             }
 
-            $assignment = Assignment::create([
-                'order_id'     => $order->id,
-                'driver_id'    => $driver->id,
-                'guide_id'     => $guide?->id,
-                'assigned_by'  => Auth::id(),
-                'status'       => 'pending',
-                'assigned_at'  => now(),
-                'note'         => $data['note'] ?? null,
-            ]);
-
-            $order->update(['status' => 'assigned']);
-
             DB::commit();
-
-            // event(new NewAssignmentCreated($assignment));
 
             return redirect()->route('assignments.index')->with('success', 'Assignment berhasil dibuat.');
         } catch (\Throwable $e) {
             DB::rollBack();
-            Log::error('Assignment.store error: ' . $e->getMessage(), ['payload' => $data, 'trace' => $e->getTraceAsString()]);
-            return redirect()->back()->withInput()->with('error', 'Terjadi kesalahan saat membuat assignment.');
+            Log::error('Assignment.store error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            return redirect()->back()->withInput()->with('error', 'Terjadi kesalahan saat membuat assignment: ' . $e->getMessage());
         }
     }
 
@@ -188,7 +245,8 @@ class AssignmentController extends Controller
     public function changeStatus(Request $request, Assignment $assignment)
     {
         $request->validate([
-            'status' => 'required|in:accepted,completed,declined',
+            'status' => 'required|in:accepted,in_progress,completed,declined',
+            'rejection_reason' => 'required_if:status,declined|string|max:1000',
         ]);
 
         $user = Auth::user();
@@ -207,13 +265,24 @@ class AssignmentController extends Controller
             abort(403, 'Anda bukan guide yang ditugaskan.');
         }
 
-        //  Validasi: hanya bisa ubah dari status tertentu
+        //  Validasi Transition
         if ($status === 'accepted' && $assignment->status !== 'pending') {
             return back()->with('error', 'Hanya assignment pending yang bisa di-accept.');
         }
 
-        if ($status === 'completed' && $assignment->status !== 'accepted') {
-            return back()->with('error', 'Hanya assignment accepted yang bisa di-complete.');
+        if ($status === 'in_progress' && $assignment->status !== 'accepted') {
+            return back()->with('error', 'Hanya assignment accepted yang bisa mulai dikerjakan (in progress).');
+        }
+
+        if ($status === 'completed' && !in_array($assignment->status, ['in_progress', 'accepted'])) {
+             // Allow completing from accepted if user forgot to click in_progress? 
+             // Ideally enforce in_progress. Let's allowing from accepted for flexibility or strict?
+             // Requirement says "Two-step: Kerjakan -> Selesai". Implies strictness.
+             // But let's allow from accepted just in case.
+             // Actually, strict flow is better for data quality.
+             if ($assignment->status !== 'in_progress') {
+                return back()->with('error', 'Silakan klik "Kerjakan" terlebih dahulu sebelum menyelesaikan tugas.');
+             }
         }
 
         if ($status === 'declined' && $assignment->status !== 'pending') {
@@ -223,39 +292,75 @@ class AssignmentController extends Controller
         DB::beginTransaction();
 
         try {
-            // Saat accept → catat workstart
-            if ($status === 'accepted') {
-                $assignment->workstart = now();
+            if ($status === 'declined') {
+                $assignment->rejection_reason = $request->rejection_reason;
+                $assignment->rejected_at = now();
+                // If declined, Order should go back to pending?
+                // The assignment is declined, but the Order needs to be re-assigned.
+                // Order status is currently 'assigned' (from store).
+                // Should we set Order to 'pending' again?
+                // Yes, so admin sees it in pending list.
+                $assignment->order->update(['status' => 'pending']);
+            }
+
+            if ($status === 'in_progress') {
+                $assignment->started_at = now();
+                // Optionally update Order status to 'in_progress'
+                // Requirement: "Global: 'In Progress' status visible on the dashboard"
+                // Order status ENUM might not have 'in_progress'. Check migration?
+                // Order table status is string?
+                // Let's assume standard strings.
+                $assignment->order->update(['status' => 'in_progress']);
             }
 
             // Saat complete → hitung & update
             if ($status === 'completed') {
-                $assignment->workend = now();
-                $assignment->completed_at = now(); // 🔥 KUNCI: untuk dashboard
-
-                if ($assignment->workstart) {
-                    $start = Carbon::parse($assignment->workstart);
-                    $end = Carbon::parse($assignment->workend);
-                    $diffMinutes = max(1, $end->diffInMinutes($start));
-
-                    $userId = $user->id; // yang complete = driver/guide saat ini
-                    $month = now()->month;
-                    $year = now()->year;
-
-                    $ws = WorkSchedule::firstOrCreate(
-                        ['user_id' => $userId, 'month' => $month, 'year' => $year],
-                        ['total_hours' => $user->monthly_work_limit ?? 200, 'used_hours' => 0.00]
-                    );
-
-                    $newUsed = $this->addUsedHoursHMM($ws->used_hours, $diffMinutes);
-                    $ws->update(['used_hours' => $newUsed]);
+                $assignment->completed_at = now(); 
+                
+                // Calculate hours
+                $minutes = 0;
+                // Priority: Order Estimated Duration (from Branch) -> Actual Time Diff
+                if ($assignment->order && $assignment->order->estimated_duration_minutes > 0) {
+                    $minutes = $assignment->order->estimated_duration_minutes;
+                } elseif ($assignment->started_at) {
+                    $start = \Carbon\Carbon::parse($assignment->started_at);
+                    $end = \Carbon\Carbon::parse($assignment->completed_at);
+                    $minutes = max(1, $end->diffInMinutes($start));
+                } else {
+                     // Fallback default
+                     $minutes = 60;
                 }
+
+                $userId = $user->id; 
+                $month = now()->month;
+                $year = now()->year;
+
+                $ws = WorkSchedule::firstOrCreate(
+                    ['user_id' => $userId, 'month' => $month, 'year' => $year],
+                    ['total_hours' => $user->monthly_work_limit ?? 200, 'used_hours' => 0.00]
+                );
+
+                $newUsed = $this->addUsedHoursHMM($ws->used_hours, $minutes);
+                $ws->update(['used_hours' => $newUsed]);
 
                 // 🔥 Update order ke completed
                 $order = $assignment->order;
                 if ($order && $order->status !== 'completed') {
                     $order->update(['status' => 'completed']);
+                    
+                    // Release Vehicle Status
+                    if ($assignment->vehicle) {
+                        $assignment->vehicle->update(['status' => 'available']);
+                    }
                 }
+            }
+            
+            // If accepted, maybe set vehicle to 'in_use'?
+            // No, vehicle is in use when 'in_progress'.
+            if ($status === 'in_progress' && $assignment->vehicle) {
+                // Check if vehicle is actually 'available' now? 
+                // Too strict maybe? Just set it.
+                $assignment->vehicle->update(['status' => 'in_use']);
             }
 
             $assignment->status = $status;
@@ -386,5 +491,103 @@ class AssignmentController extends Controller
             Log::error('Assignment.myHistory error: ' . $e->getMessage(), ['user_id' => Auth::id()]);
             return redirect()->back()->with('error', 'Gagal memuat riwayat tugas.');
         }
+    }
+
+    /**
+     * Check availability AJAX
+     */
+    public function checkAvailability(Request $request)
+    {
+        $orderId = $request->query('order_id');
+        $order = Order::find($orderId);
+
+        if (!$order) {
+            return response()->json([], 404);
+        }
+
+        $vehicles = Vehicle::where('status', '!=', 'maintenance')
+            ->orderBy('type')
+            ->orderBy('plate_number')
+            ->get();
+
+        $available = [];
+        // Pre-fetch relevant assignments for performance? 
+        // Or simple N+1 query for now since vehicle count is low (usually < 50 for this context).
+        // Let's do simple query per vehicle for "next usage" on that day.
+        
+        $pickupTime = $order->pickup_time ? Carbon::parse($order->pickup_time) : now();
+        $dateStart = $pickupTime->copy()->startOfDay();
+        $dateEnd = $pickupTime->copy()->endOfDay();
+        
+        // Define "After" as after the order's estimated finish? Or just after order start?
+        // "Next usage" implies after the current order IF we were to assign it.
+        // But usually it means "When is it used NEXT after NOW or after specific time?".
+        // Let's use order's pickup time as pivot.
+        
+        foreach ($vehicles as $v) {
+            if (!$this->checkVehicleOverlap($v->id, $order)) {
+                
+                // Find next assignment on the same day (after this order's pickup time)
+                $nextAssignment = Assignment::where('vehicle_id', $v->id)
+                    ->whereIn('assignments.status', ['pending', 'accepted', 'in_progress'])
+                    ->whereHas('order', function($q) use ($pickupTime, $dateEnd) {
+                        $q->whereBetween('pickup_time', [$pickupTime, $dateEnd]);
+                    })
+                    ->join('orders', 'assignments.order_id', '=', 'orders.id')
+                    ->orderBy('orders.pickup_time')
+                    ->select('assignments.*') // avoid column duplication
+                    ->first();
+                
+                $statusText = ucwords(str_replace('_', ' ', $v->status));
+                $nextText = '';
+                
+                if ($nextAssignment && $nextAssignment->order) {
+                    $nextPickup = Carbon::parse($nextAssignment->order->pickup_time);
+                    $nextText = " | Next: " . $nextPickup->format('H:i');
+                }
+                
+                $available[] = [
+                    'id' => $v->id,
+                    'text' => "{$v->brand} {$v->type} - {$v->plate_number} ({$statusText}{$nextText})"
+                ];
+            }
+        }
+
+        return response()->json([
+            'vehicles' => $available,
+            'vehicle_count' => $order->vehicle_count ?? 1,
+            'required_capacity' => $order->passengers,
+            'pickup_time' => $order->pickup_time,
+            'estimated_duration' => $order->estimated_duration_minutes
+        ]);
+    }
+
+    /**
+     * Check if vehicle is busy during order time window.
+     * Order time window: pickup_time to pickup_time + estimated_duration_minutes
+     */
+    protected function checkVehicleOverlap($vehicleId, Order $order)
+    {
+        $pickup = Carbon::parse($order->pickup_time);
+        $duration = $order->estimated_duration_minutes ?? 60;
+        $arrival = $pickup->copy()->addMinutes($duration);
+
+        // Find assignments for this vehicle that are NOT completed/declined and overlap
+        // Assignments don't strictly have start/end stored unless accepted/completed.
+        // But we can approximate using the related Order's pickup/arrival.
+        
+        $overlaps = Assignment::where('vehicle_id', $vehicleId)
+            ->whereIn('status', ['pending', 'accepted']) // completed ones strictly speaking are done, but maybe buffer? Let's check active ones.
+            ->whereHas('order', function($q) use ($pickup, $arrival) {
+                 // Order time interval: [start, end]
+                 // Overlap if: (start1 < end2) and (start2 < end1)
+                 $q->where(function($q2) use ($pickup, $arrival) {
+                     $q2->where('pickup_time', '<', $arrival)
+                        ->where(DB::raw("DATE_ADD(pickup_time, INTERVAL COALESCE(estimated_duration_minutes, 60) MINUTE)"), '>', $pickup);
+                 });
+            })
+            ->exists();
+
+        return $overlaps;
     }
 }

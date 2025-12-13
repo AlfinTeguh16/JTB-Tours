@@ -162,4 +162,30 @@ class VehicleController extends Controller
             return redirect()->back()->with('error','Gagal menghapus kendaraan.');
         }
     }
+    /**
+     * Show vehicle details including usage history.
+     */
+    public function show(Vehicle $vehicle)
+    {
+        try {
+            // Fetch history: assignments related to this vehicle
+            // We want to see who used it (driver) and when.
+            $history = \App\Models\Assignment::with(['driver', 'order'])
+                        ->where('vehicle_id', $vehicle->id)
+                        ->orderBy('assigned_at', 'desc')
+                        ->paginate(20);
+
+            // Check current active assignment to see if "in_use" and who is driving.
+            $activeAssignment = \App\Models\Assignment::with(['driver', 'order'])
+                                ->where('vehicle_id', $vehicle->id)
+                                ->whereIn('status', ['accepted', 'pending']) // pending is effectively reserved
+                                ->orderBy('assigned_at', 'asc')
+                                ->first();
+
+            return view('vehicles.show', compact('vehicle', 'history', 'activeAssignment'));
+        } catch (\Throwable $e) {
+            Log::error('Vehicle.show error: '.$e->getMessage(), ['vehicle_id'=>$vehicle->id, 'trace'=>$e->getTraceAsString()]);
+            return redirect()->back()->with('error','Gagal memuat detail kendaraan.');
+        }
+    }
 }

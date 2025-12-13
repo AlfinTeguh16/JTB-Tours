@@ -8,14 +8,14 @@
     <h1 class="text-2xl font-semibold">Products</h1>
 
     <div class="flex items-center space-x-2">
-      <a href="{{ route('products.create') }}" class="px-3 py-2 bg-blue-600 text-white rounded">Tambah Product</a>
+      <x-primary-button :href="route('products.create')">Tambah Product</x-primary-button>
     </div>
   </div>
 
   <form method="GET" class="mb-4 flex gap-2">
     <input name="search" value="{{ request('search') }}" placeholder="cari nama atau deskripsi" class="px-3 py-2 rounded border-gray-200 w-full" />
-    <button class="px-3 py-2 bg-gray-800 text-white rounded">Cari</button>
-    <a href="{{ route('products.index') }}" class="px-3 py-2 bg-gray-200 rounded">Reset</a>
+    <x-primary-button type="submit">Cari</x-primary-button>
+    <x-secondary-button :href="route('products.index')">Reset</x-secondary-button>
   </form>
 
   <div class="bg-white rounded shadow overflow-hidden">
@@ -47,17 +47,13 @@
                 ], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
               @endphp
 
-              <button 
-                onclick="openProductModal({!! $jsonPayload !!})"
-                class="px-2 py-1 bg-indigo-600 text-white rounded text-xs">
-                Detail
-              </button>
+              <x-primary-button type="button" onclick="openProductModal({!! $jsonPayload !!})" class="text-xs px-2 py-1">Detail</x-primary-button>
 
-              <a href="{{ route('products.edit', $p) }}" class="px-2 py-1 bg-yellow-400 text-white rounded text-xs">Edit</a>
+              <x-edit-button :href="route('products.edit', $p)">Edit</x-edit-button>
 
               <form action="{{ route('products.destroy', $p) }}" method="POST" class="inline-block" onsubmit="return confirm('Hapus product ini?')">
                 @csrf @method('DELETE')
-                <button class="px-2 py-1 bg-red-600 text-white rounded text-xs">Hapus</button>
+                <x-danger-button type="submit" class="text-xs px-2 py-1">Hapus</x-danger-button>
               </form>
             </td>
           </tr>
@@ -78,7 +74,7 @@
   <div class="fixed inset-0 bg-black/40" @click="close()"></div>
   <div class="bg-white rounded shadow-lg max-w-lg w-full p-4 z-50">
     <div class="flex items-start justify-between">
-      <h3 class="text-lg font-medium">Product #<span x-text="payload.id"></span> — <span x-text="payload.name"></span></h3>
+      <h3 class="text-lg font-medium">Product — <span x-text="payload.name"></span></h3>
       <button @click="close()" class="text-gray-500">✕</button>
     </div>
 
@@ -90,7 +86,7 @@
     </div>
 
     <div class="mt-4 flex items-center justify-end">
-      <button @click="close()" class="px-3 py-2 bg-gray-200 rounded">Close</button>
+      <x-secondary-button type="button" @click="close()">Close</x-secondary-button>
     </div>
   </div>
 </div>

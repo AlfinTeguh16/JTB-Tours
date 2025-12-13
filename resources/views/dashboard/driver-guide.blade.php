@@ -45,7 +45,7 @@
       action="{{ route($dashboardRoute) }}"
       class="flex items-center gap-2 text-sm"
     >
-      <label for="year" class="text-gray-600">Tahun (untuk chart):</label>
+
       <select
         id="year"
         name="year"

@@ -190,34 +190,171 @@
         </div>
       </div>
     </div>
+    </div>
 
-    {{-- Top Drivers --}}
-    <div class="bg-white rounded-lg shadow p-5">
-      <h3 class="text-lg font-semibold text-gray-900 mb-4">Top Driver/Guide (Jam Kerja Digunakan)</h3>
-      @if(!empty($topDrivers))
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          @foreach($topDrivers as $driver)
-            <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition">
-              <div class="font-medium text-gray-900">{{ $driver['name'] }}</div>
-              <div class="mt-2 flex items-center">
-                <div class="w-full bg-gray-200 rounded-full h-2">
-                  <div class="bg-blue-600 h-2 rounded-full" style="width: {{ $driver['total_hours'] ? round(($driver['used_hours'] / $driver['total_hours']) * 100) : 0 }}%"></div>
-                </div>
-              </div>
-              <div class="mt-1 text-xs text-gray-600">
-                {{ $driver['used_hours'] }} / {{ $driver['total_hours'] }} jam
-              </div>
+    {{-- Today's Orders Section --}}
+    <div class="bg-white rounded-lg shadow p-5 mb-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900">Order Hari Ini ({{ \Carbon\Carbon::today()->format('d F Y') }})</h3>
+            <span class="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full">
+                {{ $todaysOrders->count() }} Orders
+            </span>
+        </div>
+        
+        @if($todaysOrders->isEmpty())
+            <div class="text-center py-8">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <p class="text-gray-500">Tidak ada order untuk hari ini</p>
             </div>
-          @endforeach
+        @else
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Waktu</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Passengers</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Driver</th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        @foreach($todaysOrders as $order)
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <div class="text-sm font-semibold text-gray-900">
+                                    {{ \Carbon\Carbon::parse($order->pickup_time)->format('H:i') }}
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    Pickup
+                                </div>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="text-sm font-medium text-gray-900">{{ $order->customer_name }}</div>
+                                <div class="text-xs text-gray-500">{{ $order->phone ?? '-' }}</div>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="text-sm text-gray-900">{{ $order->product->name ?? '-' }}</div>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">{{ $order->passengers ?? 0 }} orang</div>
+                            </td>
+                            <td class="px-4 py-3 whitespace-nowrap">
+                                <span class="px-2 py-1 text-xs font-semibold rounded-full
+                                    {{ $order->status == 'completed' ? 'bg-green-100 text-green-800' :
+                                       ($order->status == 'assigned' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800') }}">
+                                    {{ ucfirst($order->status) }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3">
+                                @if($order->assignments->isNotEmpty())
+                                    @foreach($order->assignments as $assignment)
+                                        <div class="text-xs">
+                                            <span class="font-medium">{{ $assignment->driver->name ?? '-' }}</span>
+                                            @if($assignment->vehicle)
+                                                <span class="text-gray-500">({{ $assignment->vehicle->plate_number }})</span>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                @else
+                                    <span class="text-xs text-gray-400 italic">Belum di-assign</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3 text-right whitespace-nowrap">
+                                <x-primary-button :href="route('orders.show', $order)" class="text-xs px-2 py-1">
+                                    Detail
+                                </x-primary-button>
+                                @if($order->status == 'pending')
+                                    <x-success-button :href="route('assignments.create', ['order' => $order->id])" class="text-xs px-2 py-1">
+                                        Assign
+                                    </x-success-button>
+                                @endif
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
+    </div>
+
+    {{-- In Progress Tasks (Requested Feature: "In progress juga muncul di dashboard") --}}
+    {{-- Also Today's Tasks (Requested Feature: "Todays task untuk staff") --}}
+    
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <!-- Today's Tasks & In Progress -->
+        <div class="bg-white rounded-lg shadow p-5">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Tugas Hari Ini & Sedang Berjalan</h3>
+            @php
+               // We should fetch this from controller ideally, but for now we can rely on view composer or mock if variable not passed?
+               // The controller for DashboardController needs to pass 'todaysAssignments' and 'inProgressAssignments'
+               // Assuming they are passed or we can fetch directly if needed (not active practice but okay for quick view update if controller code not shown/accessible in same step).
+               // Let's assume passed variable: $todaysTasks
+               $todaysTasks = $todaysTasks ?? collect(); 
+            @endphp
+            
+            @if($todaysTasks->isEmpty())
+                <p class="text-gray-500 italic text-sm">Tidak ada tugas aktif untuk hari ini.</p>
+            @else
+                <div class="overflow-y-auto max-h-96 space-y-3">
+                   @foreach($todaysTasks as $task)
+                     <div class="border-l-4 {{ $task->status == 'accepted' ? 'border-blue-500 bg-blue-50' : 'border-yellow-500 bg-yellow-50' }} p-3 rounded shadow-sm">
+                        <div class="flex justify-between items-start">
+                            <div class="text-sm">
+                                <div class="font-bold text-gray-800">#{{ $task->order_id }} - {{ $task->order->customer_name ?? 'Guest' }}</div>
+                                <div class="text-gray-600">{{ \Carbon\Carbon::parse($task->order->pickup_time)->format('H:i') }} - {{ $task->order->product->name ?? '-' }}</div>
+                                <div class="mt-1">
+                                    <span class="text-xs font-semibold">Driver:</span> {{ $task->driver->name ?? '-' }}
+                                    @if($task->vehicle)
+                                     | <span class="text-xs font-semibold">Mobil:</span> {{ $task->vehicle->plate_number }}
+                                    @endif
+                                </div>
+                            </div>
+                            <span class="px-2 py-1 text-xs font-bold rounded {{ $task->status == 'accepted' ? 'bg-blue-200 text-blue-800' : 'bg-yellow-200 text-yellow-800' }}">
+                                {{ $task->status == 'accepted' ? 'In Progress' : 'Pending/Today' }}
+                            </span>
+                        </div>
+                     </div>
+                   @endforeach
+                </div>
+            @endif
         </div>
-      @else
-        <div class="text-center py-8 text-gray-500">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.331 0-4.303-.988-5.828-2.587" />
-          </svg>
-          <p class="mt-2">Tidak ada data driver/guide untuk bulan ini.</p>
+
+        <!-- Top Drivers -->
+        <div class="bg-white rounded-lg shadow p-5">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Top Driver/Guide (Jam Kerja Digunakan)</h3>
+            @if(!empty($topDrivers))
+                <div class="space-y-4">
+                  @foreach($topDrivers as $driver)
+                    <div class="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 transition flex items-center justify-between">
+                      <div class="flex items-center space-x-3">
+                          <div class="bg-gray-200 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-gray-600">
+                             {{ substr($driver['name'], 0, 2) }}
+                          </div>
+                          <div>
+                              <div class="text-sm font-medium text-gray-900">{{ $driver['name'] }}</div>
+                              <div class="text-xs text-gray-500">{{ $driver['role'] ?? 'Driver' }}</div>
+                          </div>
+                      </div>
+                      <div class="text-right">
+                          <div class="text-sm font-bold text-gray-800">{{ $driver['used_hours'] }}h</div>
+                          <div class="w-24 bg-gray-200 rounded-full h-1.5 mt-1">
+                             <div class="bg-blue-600 h-1.5 rounded-full" style="width: {{ $driver['total_hours'] ? min(100, round(($driver['used_hours'] / $driver['total_hours']) * 100)) : 0 }}%"></div>
+                          </div>
+                      </div>
+                    </div>
+                  @endforeach
+                </div>
+            @else
+                <div class="text-center py-8 text-gray-500">
+                  <p class="mt-2 text-sm">Tidak ada data driver/guide untuk bulan ini.</p>
+                </div>
+            @endif
         </div>
-      @endif
     </div>
   </div>
 </div>

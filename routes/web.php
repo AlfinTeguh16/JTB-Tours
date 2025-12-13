@@ -13,19 +13,10 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-*/
-
 Route::get('/', function () {
     return redirect()->route('login');
 })->name('home');
 
-/*
- * Authentication (public)
- */
 Route::get('login', [AuthController::class, 'showLoginForm'])->name('login');
 Route::post('login', [AuthController::class, 'login'])->name('login.post');
 
@@ -34,9 +25,6 @@ Route::post('register', [AuthController::class, 'register'])->name('register.pos
 
 Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 
-/*
- * Dashboard (protected)
- */
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
@@ -47,73 +35,55 @@ Route::middleware(['auth'])->group(function () {
 
 Route::prefix('dashboard')->middleware(['auth'])->group(function () {
 
-    // Admin & staff
     Route::get('/admin', [DashboardController::class, 'adminIndex'])
         ->middleware('role:admin,super_admin,staff')
         ->name('dashboard.admin');
 
-    // Driver
     Route::get('/driver', [DashboardController::class, 'driverGuideIndex'])
         ->middleware('role:driver')
         ->name('dashboard.driver');
 
-    // Guide
     Route::get('/guide', [DashboardController::class, 'driverGuideIndex'])
         ->middleware('role:guide')
         ->name('dashboard.guide');
 
-    // Fallback
     Route::get('/{any?}', function () {
         return redirect()->route('dashboard');
     })->where('any', '.*')->name('dashboard.fallback');
 });
 
-/*
- * Protected routes (require authentication)
- */
 Route::middleware(['auth'])->group(function () {
 
-    /*
-     * Users (super_admin only)
-     */
     Route::middleware(['role:super_admin'])->group(function () {
         Route::resource('users', UserController::class);
     });
 
-    /*
-     * Products (super_admin, admin)
-     */
-    Route::middleware(['role:super_admin,admin'])->group(function () {
+    // Products: sekarang hanya super_admin + staff (admin tidak lagi)
+    Route::middleware(['role:super_admin,staff'])->group(function () {
         Route::resource('products', ProductController::class);
     });
 
-    /*
-     * Vehicles (super_admin, admin)
-     */
-    Route::middleware(['role:super_admin,admin'])->group(function () {
+    // Vehicles: sekarang hanya super_admin + staff (admin tidak lagi)
+    Route::middleware(['role:super_admin,staff'])->group(function () {
         Route::resource('vehicles', VehicleController::class);
     });
 
-    // Notifikasi order baru – KHUSUS STAFF
     Route::middleware(['role:staff'])->group(function () {
         Route::get('orders/check-latest', [OrderController::class, 'checkLatest'])
             ->name('orders.check-latest');
     });
-    /*
-     * Orders (super_admin, admin, staff)
-     */
+
+    // Orders: super_admin, admin, staff (admin tetap boleh CRUD orders)
     Route::middleware(['role:super_admin,admin,staff'])->group(function () {
         Route::resource('orders', OrderController::class);
     });
 
-
-    /*
-     * Assignments
-     */
-    Route::middleware(['role:super_admin,admin,staff'])->group(function () {
+    // Assignments: sekarang hanya super_admin + staff (admin tidak lagi)
+    Route::middleware(['role:super_admin,staff'])->group(function () {
         Route::get('assignments', [AssignmentController::class, 'index'])->name('assignments.index');
         Route::get('assignments/create', [AssignmentController::class, 'create'])->name('assignments.create');
         Route::post('assignments', [AssignmentController::class, 'store'])->name('assignments.store');
+        Route::get('assignments/check-vehicle', [AssignmentController::class, 'checkAvailability'])->name('assignments.check-vehicle');
         Route::delete('assignments/{assignment}', [AssignmentController::class, 'destroy'])->name('assignments.destroy');
     });
 
@@ -122,14 +92,13 @@ Route::middleware(['auth'])->group(function () {
         Route::post('assignments/{assignment}/status', [AssignmentController::class, 'changeStatus'])->name('assignments.changeStatus');
     });
 
+    // Show assignment: admin dihapus, hanya super_admin, staff, driver, guide
     Route::get('assignments/{assignment}', [AssignmentController::class, 'show'])
         ->name('assignments.show')
-        ->middleware('role:super_admin,admin,staff,driver,guide');
+        ->middleware('role:super_admin,staff,driver,guide');
 
-    /*
-     * Availability
-     */
-    Route::middleware(['role:super_admin,admin,staff'])->group(function () {
+    // Availability: sekarang hanya super_admin + staff (admin tidak lagi)
+    Route::middleware(['role:super_admin,staff'])->group(function () {
         Route::get('availability', [AvailabilityController::class, 'index'])->name('availability.index');
         Route::post('availability/{user}/force', [AvailabilityController::class, 'forceChange'])->name('availability.force');
     });
@@ -138,10 +107,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('availability/toggle', [AvailabilityController::class, 'toggle'])->name('availability.toggle');
     });
 
-    /*
-     * Work schedules
-     */
-    Route::middleware(['role:super_admin,admin,staff'])->group(function () {
+    // Work schedules: sekarang hanya super_admin + staff (admin tidak lagi)
+    Route::middleware(['role:super_admin,staff'])->group(function () {
         Route::get('work-schedules', [WorkScheduleController::class, 'index'])->name('work-schedules.index');
         Route::post('work-schedules/generate', [WorkScheduleController::class, 'generateForAll'])->name('work-schedules.generate');
         Route::post('work-schedules/bulk', [WorkScheduleController::class, 'bulkUpdate'])->name('work-schedules.bulkUpdate');
@@ -151,13 +118,13 @@ Route::middleware(['auth'])->group(function () {
         Route::put('work-schedules/{workSchedule}', [WorkScheduleController::class, 'update'])->name('work-schedules.update');
     });
 
-    // Reports
     Route::middleware(['auth'])->group(function () {
 
+        // Semua yang login bisa lihat halaman reports.index (termasuk admin)
         Route::get('reports', [ReportController::class, 'index'])
             ->name('reports.index');
 
-        // Export laporan sistem (admin/staff)
+        // Export laporan sistem: super_admin, admin, staff
         Route::middleware(['role:super_admin,admin,staff'])->group(function () {
             Route::get('reports/export/excel', [ReportController::class, 'exportExcel'])
                 ->name('reports.export.excel');
@@ -166,7 +133,7 @@ Route::middleware(['auth'])->group(function () {
                 ->name('reports.export.pdf');
         });
 
-        // Export laporan pribadi (driver/guide)
+        // Export laporan pribadi: driver/guide
         Route::middleware(['role:driver,guide'])->group(function () {
             Route::get('reports/personal/export/pdf', [ReportController::class, 'exportPersonalPdf'])
                 ->name('reports.personal.export.pdf');
@@ -178,9 +145,6 @@ Route::middleware(['auth'])->group(function () {
 
 });
 
-/*
- * Health check
- */
 Route::get('/ping', function () {
     return response('pong', 200);
 });

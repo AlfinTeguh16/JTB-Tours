@@ -19,6 +19,7 @@
         <option value="">Semua</option>
         <option value="pending" @if(request('status')=='pending') selected @endif>Pending</option>
         <option value="accepted" @if(request('status')=='accepted') selected @endif>Accepted</option>
+        <option value="in_progress" @if(request('status')=='in_progress') selected @endif>In Progress</option>
         <option value="declined" @if(request('status')=='declined') selected @endif>Declined</option>
         <option value="completed" @if(request('status')=='completed') selected @endif>Completed</option>
       </select>
@@ -92,8 +93,8 @@
               <div class="text-xs text-gray-500">{{ $a->order->pickup_time ? \Carbon\Carbon::parse($a->order->pickup_time)->format('d M Y H:i') : '-' }}</div>
             </td>
             <td class="px-4 py-3 text-sm">
-              <div>{{ $a->driver->name ?? '-' }} <span class="text-xs text-gray-400">({{ $a->driver_id }})</span></div>
-              <div class="text-xs text-gray-500">{{ $a->guide->name ?? '-' }} <span class="text-xs text-gray-400">({{ $a->guide_id ?? '-' }})</span></div>
+              <div>{{ $a->driver->name ?? '-' }}</div>
+              <div class="text-xs text-gray-500">{{ $a->guide->name ?? '-' }}</div>
             </td>
             <td class="px-4 py-3 text-sm">{{ $a->assigned_at ? \Carbon\Carbon::parse($a->assigned_at)->format('d M Y H:i') : '-' }}</td>
             <td class="px-4 py-3 text-sm">
@@ -102,6 +103,7 @@
                 $badge = match($a->status) {
                   'pending' => 'bg-yellow-100 text-yellow-800',
                   'accepted' => 'bg-green-100 text-green-800',
+                  'in_progress' => 'bg-blue-50 text-blue-600 border border-blue-200',
                   'declined' => 'bg-red-100 text-red-800',
                   'completed'=> 'bg-blue-100 text-blue-800',
                   default => 'bg-gray-100 text-gray-800'
@@ -149,37 +151,15 @@
       <div><strong>Pickup:</strong> <span x-text="payload.order.pickup"></span></div>
       <div><strong>From / To:</strong> <span x-text="payload.order.from"></span> → <span x-text="payload.order.to"></span></div>
       <div><strong>Product:</strong> <span x-text="payload.order.product"></span></div>
-      <div><strong>Driver:</strong> <span x-text="payload.driver?.name ?? '-'"></span> (<span x-text="payload.driver?.id ?? '-'"></span>)</div>
-      <div><strong>Guide:</strong> <span x-text="payload.guide?.name ?? '-'"></span> (<span x-text="payload.guide?.id ?? '-'"></span>)</div>
+      <div><strong>Driver:</strong> <span x-text="payload.driver?.name ?? '-'"></span></div>
+      <div><strong>Guide:</strong> <span x-text="payload.guide?.name ?? '-'"></span></div>
       <div><strong>Note:</strong> <span x-text="payload.note ?? '-'"></span></div>
       <div><strong>Status:</strong> <span x-text="payload.status ?? '-'"></span></div>
     </div>
 
     <div class="mt-4 flex items-center justify-end space-x-2">
-      {{-- jika current user adalah driver/guide terkait, tampilkan action --}}
-      @auth
-      <template x-if="isCurrentPerformer()">
-        <div class="flex items-center space-x-2">
-          <form :action="changeStatusUrl('accepted')" method="POST" x-ref="formAccept">
-            @csrf
-            <input type="hidden" name="status" value="accepted" />
-            <button type="button" @click="submitForm($refs.formAccept)" class="px-3 py-2 bg-green-600 text-white rounded">Accept</button>
-          </form>
-
-          <form :action="changeStatusUrl('declined')" method="POST" x-ref="formDecline">
-            @csrf
-            <input type="hidden" name="status" value="declined" />
-            <button type="button" @click="submitForm($refs.formDecline)" class="px-3 py-2 bg-red-600 text-white rounded">Decline</button>
-          </form>
-
-          <form :action="changeStatusUrl('completed')" method="POST" x-ref="formCompleted">
-            @csrf
-            <input type="hidden" name="status" value="completed" />
-            <button type="button" @click="submitForm($refs.formCompleted)" class="px-3 py-2 bg-blue-600 text-white rounded">Complete</button>
-          </form>
-        </div>
-      </template>
-      @endauth
+      {{-- Admin/Staff tidak melakukan aksi driver di sini --}}
+      {{-- Admin/Staff tidak melakukan aksi driver di sini --}}
 
       <button @click="close()" class="px-3 py-2 bg-gray-200 rounded">Close</button>
     </div>

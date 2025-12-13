@@ -9,11 +9,11 @@
     <h1 class="text-2xl font-semibold">Orders</h1>
     <div class="flex flex-wrap gap-2">
       @if(auth()->check() && in_array(auth()->user()->role, ['super_admin','admin']))
-        <a href="{{ route('orders.create') }}" class="px-3 py-2 bg-blue-600 text-white rounded text-sm whitespace-nowrap">Buat Order</a>
+        <x-primary-button :href="route('orders.create')">Buat Order</x-primary-button>
       @endif
 
-      <a href="{{ route('reports.export.excel', array_merge(request()->query(), ['type' => 'orders'])) }}" class="px-3 py-2 bg-gray-100 rounded text-sm whitespace-nowrap">Export Excel</a>
-      <a href="{{ route('reports.export.pdf', array_merge(request()->query(), ['type' => 'orders'])) }}" class="px-3 py-2 bg-gray-100 rounded text-sm whitespace-nowrap">Export PDF</a>
+      <x-secondary-button :href="route('reports.export.excel', array_merge(request()->query(), ['type' => 'orders']))">Export Excel</x-secondary-button>
+      <x-secondary-button :href="route('reports.export.pdf', array_merge(request()->query(), ['type' => 'orders']))">Export PDF</x-secondary-button>
     </div>
   </div>
 
@@ -59,8 +59,8 @@
     </div>
 
     <div class="flex items-end gap-2">
-      <button class="px-3 py-2 bg-gray-800 text-white rounded text-sm w-full sm:w-auto">Filter</button>
-      <a href="{{ route('orders.index') }}" class="px-3 py-2 bg-gray-200 rounded text-sm w-full sm:w-auto text-center">Reset</a>
+      <x-primary-button type="submit">Filter</x-primary-button>
+      <x-secondary-button :href="route('orders.index')">Reset</x-secondary-button>
     </div>
   </form>
 
@@ -124,23 +124,20 @@
                   'note' => $o->note ?? '-',
                   'status' => $o->status ?? 'pending',
                 ];
-                $payload_b64 = base64_encode(json_encode($payload, JSON_UNESCAPED_UNICODE));
+                $jsonPayload = htmlspecialchars(json_encode($payload, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8');
               @endphp
 
-              <button type="button"
-                data-payload-b64="{{ $payload_b64 }}"
-                onclick="openOrderModal(this)"
-                class="px-2 py-1 bg-indigo-600 text-white rounded text-xs">Detail</button>
+              <x-primary-button type="button" onclick="openOrderModal({!! $jsonPayload !!})" class="text-xs px-2 py-1">Detail</x-primary-button>
 
               @if(auth()->check() && in_array(auth()->user()->role, ['super_admin','admin']))
-                <a href="{{ route('orders.edit', $o) }}" class="px-2 py-1 ml-1 bg-yellow-400 text-white rounded text-xs">Edit</a>
+                <x-edit-button :href="route('orders.edit', $o)">Edit</x-edit-button>
 
-                <form action="{{ route('orders.destroy', $o) }}" method="POST" class="inline-block" onsubmit="return confirm('Hapus order #{{ $o->id }}?')">
+                <form action="{{ route('orders.destroy', $o) }}" method="POST" class="inline-block" onsubmit="return confirm('Hapus order ini?')">
                   @csrf @method('DELETE')
-                  <button class="px-2 py-1 ml-1 bg-red-600 text-white rounded text-xs">Hapus</button>
+                  <x-danger-button type="submit" class="text-xs px-2 py-1">Hapus</x-danger-button>
                 </form>
 
-                <a href="{{ route('assignments.create', ['order' => $o->id]) }}" class="px-2 py-1 ml-1 bg-green-600 text-white rounded text-xs">Assign</a>
+                <x-success-button :href="route('assignments.create', ['order' => $o->id])" class="text-xs px-2 py-1">Assign</x-success-button>
               @endif
             </td>
           </tr>
@@ -167,12 +164,12 @@
 
     <div class="mt-3 space-y-2 text-sm">
       <template x-for="(value, key) in payload" :key="key">
-        <div><strong x-text="key.charAt(0).toUpperCase() + key.slice(1) + ':'"></strong> <span x-text="value"></span></div>
+        <div x-show="key !== 'id'"><strong x-text="key.charAt(0).toUpperCase() + key.slice(1) + ':'"></strong> <span x-text="value"></span></div>
       </template>
     </div>
 
     <div class="mt-4 flex items-center justify-end">
-      <button @click="close()" class="px-3 py-2 bg-gray-200 rounded">Close</button>
+      <x-secondary-button type="button" @click="close()">Close</x-secondary-button>
     </div>
   </div>
 </div>
@@ -193,11 +190,9 @@
     }
   }
 
-  function openOrderModal(el) {
+  function openOrderModal(data) {
     try {
-      const raw = el.getAttribute('data-payload-b64');
-      const payload = JSON.parse(atob(raw));
-      window.dispatchEvent(new CustomEvent('open-order-modal', { detail: payload }));
+      window.dispatchEvent(new CustomEvent('open-order-modal', { detail: data }));
     } catch (err) {
       console.error('openOrderModal error', err);
     }

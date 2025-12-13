@@ -56,18 +56,46 @@ class ProductController extends Controller
             'name' => 'required|string|max:255',
             'capacity' => 'required|integer|min:1',
             'description' => 'nullable|string|max:2000',
-            'hour' => 'required|numeric|min:0',
+            'hour' => 'nullable|numeric|min:0', // Legacy field, might be ignored if branches exist
+            // Exclusive fields
+            'is_exclusive' => 'boolean',
+            'snack' => 'boolean',
+            'water' => 'boolean',
+            'magazine' => 'boolean',
+            'custom_exclusive_benefits' => 'nullable|array',
+            'custom_exclusive_benefits.*' => 'string|max:255',
+            // Branches validation
+            'branches' => 'nullable|array',
+            'branches.*.name' => 'required_with:branches|string|max:255',
+            'branches.*.origin_region' => 'nullable|string|max:255',
+            'branches.*.destination_region' => 'nullable|string|max:255',
+            'branches.*.duration_minutes' => 'required_with:branches|integer|min:1',
+            'branches.*.price' => 'nullable|numeric|min:0',
         ]);
 
         DB::beginTransaction();
         try {
-            Product::create($data);
+            // Checkboxes defaults
+            $data['is_exclusive'] = $request->boolean('is_exclusive');
+            $data['snack'] = $request->boolean('snack');
+            $data['water'] = $request->boolean('water');
+            $data['magazine'] = $request->boolean('magazine');
+
+            $product = Product::create(\Illuminate\Support\Arr::except($data, ['branches']));
+
+            // Create Branches
+            if ($request->has('branches') && is_array($request->branches)) {
+                foreach ($request->branches as $branchData) {
+                    $product->branches()->create($branchData);
+                }
+            }
+
             DB::commit();
-            return redirect()->route('products.index')->with('success','Product berhasil dibuat.');
+            return redirect()->route('products.index')->with('success','Product dan cabang berhasil dibuat.');
         } catch (\Throwable $e) {
             DB::rollBack();
             Log::error('Product.store error: '.$e->getMessage(), ['payload'=>$data, 'trace'=>$e->getTraceAsString()]);
-            return redirect()->back()->withInput()->with('error','Gagal membuat product.');
+            return redirect()->back()->withInput()->with('error','Gagal membuat product: ' . $e->getMessage());
         }
     }
 
@@ -108,17 +136,75 @@ class ProductController extends Controller
             'capacity' => 'nullable|integer|min:1',
             'description' => 'nullable|string|max:2000',
             'hour' => 'nullable|numeric|min:0',
+             // Exclusive fields
+             'is_exclusive' => 'boolean',
+             'snack' => 'boolean',
+             'water' => 'boolean',
+             'magazine' => 'boolean',
+             'custom_exclusive_benefits' => 'nullable|array',
+             'custom_exclusive_benefits.*' => 'string|max:255',
+             // Branches validation
+             'branches' => 'nullable|array',
+             'branches.*.id' => 'nullable|integer|exists:product_branches,id',
+             'branches.*.name' => 'required_with:branches|string|max:255',
+             'branches.*.origin_region' => 'nullable|string|max:255',
+             'branches.*.destination_region' => 'nullable|string|max:255',
+             'branches.*.duration_minutes' => 'required_with:branches|integer|min:1',
+             'branches.*.price' => 'nullable|numeric|min:0',
+             'branches.*._destruct' => 'nullable|boolean', // Flag to delete
         ]);
 
         DB::beginTransaction();
         try {
-            $product->update($data);
+             // Checkboxes defaults
+             $data['is_exclusive'] = $request->boolean('is_exclusive');
+             $data['snack'] = $request->boolean('snack');
+             $data['water'] = $request->boolean('water');
+             $data['magazine'] = $request->boolean('magazine');
+
+            $product->update(\Illuminate\Support\Arr::except($data, ['branches']));
+
+            // Sync Branches
+            // Strategy: 
+            // 1. IDs in input -> update
+            // 2. No ID in input -> create
+            // 3. IDs not in input -> delete (if we want full sync)
+            // OR use _destruct flag for deletion (easier to manage in UI)
+            
+            if ($request->has('branches') && is_array($request->branches)) {
+                $incomingIds = [];
+                
+                foreach ($request->branches as $branchData) {
+                    // Check for deletion flag
+                    if (isset($branchData['_destruct']) && $branchData['_destruct'] == 1) {
+                        if (isset($branchData['id'])) {
+                            // Delete existing
+                            $product->branches()->where('id', $branchData['id'])->delete();
+                        }
+                        continue;
+                    }
+
+                    if (isset($branchData['id']) && $branchData['id']) {
+                        // Update
+                        $b = $product->branches()->find($branchData['id']);
+                        if ($b) {
+                            $b->update($branchData);
+                            $incomingIds[] = $b->id;
+                        }
+                    } else {
+                        // Create
+                        $newBranch = $product->branches()->create($branchData);
+                        $incomingIds[] = $newBranch->id;
+                    }
+                }
+            }
+
             DB::commit();
             return redirect()->route('products.index')->with('success','Product diperbarui.');
         } catch (\Throwable $e) {
             DB::rollBack();
             Log::error('Product.update error: '.$e->getMessage(), ['product_id'=>$product->id, 'payload'=>$data, 'trace'=>$e->getTraceAsString()]);
-            return redirect()->back()->withInput()->with('error','Gagal memperbarui product.');
+            return redirect()->back()->withInput()->with('error','Gagal memperbarui product: ' . $e->getMessage());
         }
     }
 

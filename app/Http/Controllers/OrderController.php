@@ -100,8 +100,14 @@ class OrderController extends Controller
     public function create()
     {
         try {
-            $products = Product::orderBy('name')->get();
-            return view('orders.create', compact('products'));
+            $products = Product::with('branches')->orderBy('name')->get();
+            // Get unique vehicle types from DB, combined with defaults
+            $dbTypes = \App\Models\Vehicle::select('type')->distinct()->pluck('type')->toArray();
+            $defaultTypes = ['Avanza', 'Innova', 'HiAce', 'Bus', 'Alphard', 'APV']; // Common defaults
+            $vehicleTypes = array_unique(array_merge($dbTypes, $defaultTypes));
+            sort($vehicleTypes);
+
+            return view('orders.create', compact('products', 'vehicleTypes'));
         } catch (\Throwable $e) {
             Log::error('Order.create error: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
             return redirect()->back()->with('error', 'Gagal membuka form pembuatan order.');
@@ -124,6 +130,8 @@ class OrderController extends Controller
             'pickup_location'            => 'nullable|string|max:255',
             'destination'                => 'nullable|string|max:255',
             'product_id'                 => 'required|exists:products,id',
+            'product_branch_id'          => 'nullable|exists:product_branches,id', // Added
+            'vehicle_type'               => 'nullable|string|max:50', // Added
             'adults'                     => 'nullable|integer|min:0',
             'children'                   => 'nullable|integer|min:0',
             'babies'                     => 'nullable|integer|min:0',
@@ -134,30 +142,61 @@ class OrderController extends Controller
         DB::beginTransaction();
         try {
             // 🔎 Cek kapasitas product (sama seperti di update)
-            $product = Product::find($validated['product_id']);
+            // 🔎 Cek kapasitas product (sama seperti di update)
+            $product = Product::with('branches')->find($validated['product_id']);
 
             $adults  = $validated['adults']   ?? 0;
             $children = $validated['children'] ?? 0;
             $babies  = $validated['babies']   ?? 0;
             $totalPassengers = $adults + $children + $babies;
 
-            if ($product && $product->capacity !== null && $product->capacity > 0 && $totalPassengers > $product->capacity) {
-                return redirect()->back()->withInput()->with(
-                    'error',
-                    'Total penumpang melebihi kapasitas product (' . $product->capacity . ').'
-                );
+            // Capacity Check removed or made optional? 
+            // Requirement 1.5: "Jika jumlah penumpang > 4 ... otomatis hitung butuh 2 mobil"
+            // So we shouldn't block if passengers > product capacity, but rather increase vehicle count.
+            // BUT, if product is "Ticket" (e.g. Activity), maybe capacity is per unit?
+            // "Transfer Hotel" product likely refers to the *service*.
+            // Let's assume Capacity in Product is "Default car capacity".
+            // We will just calculate vehicle count here.
+            
+            // Auto-calculate Vehicle Count
+            $vehicleCap = $product->capacity ?? 4; // Default fallback
+            // If vehicle type implies capacity, use that
+            // Simple mapping for calculation
+            if (!empty($validated['vehicle_type'])) {
+                $t = strtolower($validated['vehicle_type']);
+                if (str_contains($t, 'hiace') || str_contains($t, 'elf')) $vehicleCap = 12;
+                if (str_contains($t, 'bus')) $vehicleCap = 24;
+                if (str_contains($t, 'innova')) $vehicleCap = 6;
+                if (str_contains($t, 'avanza') || str_contains($t, 'apv')) $vehicleCap = 6;
+            }
+            
+            if (empty($validated['vehicle_count'])) {
+                $validated['vehicle_count'] = ceil($totalPassengers / max(1, $vehicleCap));
             }
 
-            // hitung estimasi durasi jika tidak diinput
-            $est = $validated['estimated_duration_minutes'] ?? null;
-            if (empty($est) && !empty($validated['arrival_time']) && !empty($validated['pickup_time'])) {
-                $diffMinutes = max(1, (int) round(
-                    (strtotime($validated['arrival_time']) - strtotime($validated['pickup_time'])) / 60
-                ));
-                $validated['estimated_duration_minutes'] = $diffMinutes;
-            } elseif (empty($est)) {
-                // fallback default 60 menit
-                $validated['estimated_duration_minutes'] = 60;
+            // Duration Logic
+            // Priority: User Input > Branch Duration > Product Default > 60 min
+            if (empty($validated['estimated_duration_minutes'])) {
+                if (!empty($validated['product_branch_id'])) {
+                    // Get duration from selected branch
+                    $branch = $product->branches->find($validated['product_branch_id']);
+                    if ($branch) {
+                        $validated['estimated_duration_minutes'] = $branch->duration_minutes;
+                    }
+                } 
+                
+                // Fallback to time diff if still empty and checks out
+                if (empty($validated['estimated_duration_minutes']) && !empty($validated['arrival_time']) && !empty($validated['pickup_time'])) {
+                    $diffMinutes = max(1, (int) round(
+                        (strtotime($validated['arrival_time']) - strtotime($validated['pickup_time'])) / 60
+                    ));
+                    $validated['estimated_duration_minutes'] = $diffMinutes;
+                }
+                
+                // Final fallback
+                if (empty($validated['estimated_duration_minutes'])) {
+                   $validated['estimated_duration_minutes'] = (int)($product->hour * 60) ?: 60;
+                }
             }
 
             $validated['created_by'] = Auth::check() ? Auth::id() : null;
@@ -201,8 +240,14 @@ class OrderController extends Controller
     public function edit(Order $order)
     {
         try {
-            $products = Product::orderBy('name')->get();
-            return view('orders.edit', compact('order', 'products'));
+            $products = Product::with('branches')->orderBy('name')->get();
+             // Get unique vehicle types from DB, combined with defaults
+            $dbTypes = \App\Models\Vehicle::select('type')->distinct()->pluck('type')->toArray();
+            $defaultTypes = ['Avanza', 'Innova', 'HiAce', 'Bus', 'Alphard', 'APV']; // Common defaults
+            $vehicleTypes = array_unique(array_merge($dbTypes, $defaultTypes));
+            sort($vehicleTypes);
+
+            return view('orders.edit', compact('order', 'products', 'vehicleTypes'));
         } catch (\Throwable $e) {
             Log::error('Order.edit error: ' . $e->getMessage(), [
                 'order_id' => $order->id,
@@ -228,6 +273,8 @@ class OrderController extends Controller
             'pickup_location'            => 'nullable|string|max:255',
             'destination'                => 'nullable|string|max:255',
             'product_id'                 => 'required|exists:products,id',
+            'product_branch_id'          => 'nullable|exists:product_branches,id', // Added
+            'vehicle_type'               => 'nullable|string|max:50', // Added
             'adults'                     => 'nullable|integer|min:0',
             'children'                   => 'nullable|integer|min:0',
             'babies'                     => 'nullable|integer|min:0',

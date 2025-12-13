@@ -6,7 +6,7 @@
 <div class="max-w-2xl mx-auto p-4">
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl font-semibold">Edit Kendaraan</h1>
-    <a href="{{ route('vehicles.index') }}" class="px-3 py-2 bg-gray-200 rounded">Kembali</a>
+    <x-secondary-button :href="route('vehicles.index')">Kembali</x-secondary-button>
   </div>
 
   <form action="{{ route('vehicles.update', $vehicle) }}" method="POST" class="bg-white p-4 rounded shadow">

@@ -92,7 +92,7 @@
                 onclick="openUserModal(this)"
               >Detail</button>
 
-              <a href="{{ route('users.edit', $u) }}" class="px-2 py-1 ml-1 bg-yellow-400 text-white rounded text-xs">Edit</a>
+              <x-edit-button :href="route('users.edit', $u)">Edit</x-edit-button>
 
               <form action="{{ route('users.destroy', $u) }}" method="POST" class="inline-block" onsubmit="return confirm('Hapus user ini?')">
                 @csrf @method('DELETE')
@@ -117,7 +117,7 @@
   <div class="fixed inset-0 bg-black/40" @click="close()"></div>
   <div class="bg-white rounded shadow-lg max-w-lg w-full p-4 z-50">
     <div class="flex items-start justify-between">
-      <h3 class="text-lg font-medium">User #<span x-text="payload.id"></span> — <span x-text="payload.name"></span></h3>
+      <h3 class="text-lg font-medium">User — <span x-text="payload.name"></span></h3>
       <button @click="close()" class="text-gray-500">✕</button>
     </div>
 

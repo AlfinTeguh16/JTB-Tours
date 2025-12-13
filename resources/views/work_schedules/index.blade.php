@@ -15,17 +15,7 @@
       </div>
     </div>
 
-    <div class="flex items-center gap-2">
-      {{-- Generate for all — tetap ada untuk manual (e.g. preview bulan depan) --}}
-      <form action="{{ route('work-schedules.generate') }}" method="POST" class="inline-block">
-        @csrf
-        <input type="hidden" name="year" value="{{ $year }}">
-        <input type="hidden" name="month" value="{{ $month }}">
-        <button type="submit" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition">
-          Generate for All
-        </button>
-      </form>
-    </div>
+
   </div>
 
   {{-- Filters: month / year --}}
@@ -134,10 +124,7 @@
 
               <td class="px-4 py-3 text-sm text-right">
                 @if($ws)
-                  <a href="{{ route('work-schedules.edit', $ws) }}"
-                     class="px-2 py-1 bg-yellow-500 hover:bg-yellow-600 text-white rounded text-xs transition">
-                    Edit
-                  </a>
+                  <x-edit-button :href="route('work-schedules.edit', $ws)">Edit</x-edit-button>
                 @else
                   <span class="text-xs text-gray-400">—</span>
                 @endif

@@ -5,28 +5,27 @@
 
 @php
     use Carbon\Carbon;
-
     $month = $month ?? now()->month;
     $year  = $year ?? now()->year;
     $periodLabel = Carbon::create($year, $month, 1)->format('F Y');
 @endphp
 
-<div class="max-w-3xl mx-auto p-4">
-  <div class="flex items-center justify-between mb-4">
-    <h1 class="text-2xl font-semibold">Buat Assignment</h1>
-    <a href="{{ route('assignments.index') }}" class="px-3 py-2 bg-gray-200 rounded text-sm">
+<div class="max-w-4xl mx-auto p-6">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-800">Buat Assignment</h1>
+    <a href="{{ route('assignments.index') }}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">
       Kembali
     </a>
   </div>
 
-  <form action="{{ route('assignments.store') }}" method="POST" class="bg-white p-4 rounded shadow space-y-4">
+  <form action="{{ route('assignments.store') }}" method="POST" class="bg-white p-6 rounded-lg shadow-md space-y-6"
+        x-data="assignmentForm()">
     @csrf
 
-    {{-- Error message --}}
     @if($errors->any())
-      <div class="rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
-        <div class="font-semibold mb-1">Terjadi kesalahan:</div>
-        <ul class="list-disc list-inside space-y-0.5">
+      <div class="p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded">
+        <strong>Terjadi kesalahan:</strong>
+        <ul class="list-disc pl-5 mt-1">
           @foreach($errors->all() as $error)
             <li>{{ $error }}</li>
           @endforeach
@@ -34,149 +33,165 @@
       </div>
     @endif
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       {{-- Pilih Order --}}
-      <div>
+      <div class="col-span-1 md:col-span-2">
         <label class="block text-sm font-medium text-gray-700">Pilih Order</label>
-        <select
-          name="order_id"
-          required
-          class="mt-1 block w-full rounded border-gray-200 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-        >
+        <select name="order_id" x-model="orderId" @change="fetchOrderDetails" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
           <option value="">-- pilih order --</option>
           @foreach($orders as $o)
             @php
-              $pickup = $o->pickup_time
-                ? Carbon::parse($o->pickup_time)->format('d M Y H:i')
-                : '-';
+              $pickup = $o->pickup_time ? Carbon::parse($o->pickup_time)->format('d M Y H:i') : '-';
             @endphp
-            <option
-              value="{{ $o->id }}"
-              @selected(old('order_id', $order->id ?? null) == $o->id)
-            >
-              #{{ $o->id }} — {{ $o->customer_name }} / {{ $pickup }}
+            <option value="{{ $o->id }}" @selected(old('order_id', $order->id ?? null) == $o->id)>
+              #{{ $o->id }} — {{ $o->customer_name }} / {{ $pickup }} ({{ $o->passengers }} pax) / {{ $o->vehicle_count }} Unit
             </option>
           @endforeach
         </select>
-      </div>
-
-      {{-- Pilih Driver + Jam Kerja Bulan Ini --}}
-      <div>
-        <label class="block text-sm font-medium text-gray-700">
-          Pilih Driver
-          <span class="text-xs text-gray-400">
-            (jam kerja bulan {{ $periodLabel }})
-          </span>
-        </label>
-        <select
-          name="driver_id"
-          required
-          class="mt-1 block w-full rounded border-gray-200 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-        >
-          <option value="">-- pilih driver --</option>
-          @foreach($drivers as $d)
-            @php
-              $schedule = $driverSchedules[$d->id] ?? null;
-              $totalHours = (int) ($schedule->total_hours ?? $d->monthly_work_limit ?? 200);
-              $usedHours  = (float) ($schedule->used_hours ?? 0);
-              $remaining  = max(0, $totalHours - $usedHours);
-
-              // warna ringan di text kalau sudah penuh
-              $optionClass = $remaining <= 0 ? 'text-gray-400' : '';
-            @endphp
-            <option
-              value="{{ $d->id }}"
-              @selected(old('driver_id') == $d->id)
-              @if($remaining <= 0) disabled @endif
-              class="{{ $optionClass }}"
-            >
-              {{ $d->name }}
-              @if($d->phone)
-                ({{ $d->phone }})
-              @endif
-              — {{ $usedHours }} / {{ $totalHours }} jam
-              (sisa {{ $remaining }}h)
-              @if($remaining <= 0)
-                — Penuh
-              @endif
-            </option>
-          @endforeach
-        </select>
-        <p class="mt-1 text-xs text-gray-500">
-          Angka menunjukkan jam kerja driver bulan ini: terpakai / total / sisa.
-          Driver yang jam kerjanya penuh akan dinonaktifkan dari pilihan.
+        <p class="text-xs text-gray-500 mt-1">
+            <span x-show="isLoading" class="text-blue-600">Memuat detail order...</span>
+            <span x-show="!isLoading && vehicleCount > 0">Membutuhkan <span x-text="vehicleCount" class="font-bold"></span> kendaraan.</span>
         </p>
       </div>
 
-      {{-- Pilih Guide + Jam Kerja Bulan Ini (opsional) --}}
-      <div>
-        <label class="block text-sm font-medium text-gray-700">
-          Pilih Guide (opsional)
-          <span class="text-xs text-gray-400">
-            (jam kerja bulan {{ $periodLabel }})
-          </span>
-        </label>
-        <select
-          name="guide_id"
-          class="mt-1 block w-full rounded border-gray-200 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-        >
-          <option value="">-- tidak ada --</option>
-          @foreach($guides as $g)
-            @php
-              $schedule = $guideSchedules[$g->id] ?? null;
-              $totalHours = (int) ($schedule->total_hours ?? $g->monthly_work_limit ?? 200);
-              $usedHours  = (float) ($schedule->used_hours ?? 0);
-              $remaining  = max(0, $totalHours - $usedHours);
-              $optionClass = $remaining <= 0 ? 'text-gray-400' : '';
-            @endphp
-            <option
-              value="{{ $g->id }}"
-              @selected(old('guide_id') == $g->id)
-              @if($remaining <= 0) disabled @endif
-              class="{{ $optionClass }}"
-            >
-              {{ $g->name }}
-              @if($g->phone)
-                ({{ $g->phone }})
-              @endif
-              — {{ $usedHours }} / {{ $totalHours }} jam
-              (sisa {{ $remaining }}h)
-              @if($remaining <= 0)
-                — Penuh
-              @endif
-            </option>
-          @endforeach
-        </select>
-        <p class="mt-1 text-xs text-gray-500">
-          Sisa jam kerja guide membantu memastikan tidak melampaui kuota bulan ini.
-        </p>
+      {{-- Dynamic Rows --}}
+      <template x-for="(item, index) in items" :key="index">
+         <div class="col-span-1 md:col-span-2 border p-4 rounded-md bg-gray-50 relative">
+             <div class="absolute top-2 right-2 text-xs font-bold text-gray-400" x-text="'Kendaraan #' + (index + 1)"></div>
+             
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Select Driver -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Pilih Driver</label>
+                    <select :name="'assignments['+index+'][driver_id]'" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                      <option value="">-- pilih driver --</option>
+                      @foreach($drivers as $d)
+                        @php
+                          $schedule = $driverSchedules[$d->id] ?? null;
+                          $totalHours = (int) ($schedule->total_hours ?? $d->monthly_work_limit ?? 200);
+                          $usedHours  = (float) ($schedule->used_hours ?? 0);
+                          $remaining  = max(0, $totalHours - $usedHours);
+                          $optionClass = $remaining <= 0 ? 'text-gray-400 bg-gray-50' : '';
+                        @endphp
+                        <option value="{{ $d->id }}" @if($remaining <= 0) disabled @endif class="{{ $optionClass }}">
+                          {{ $d->name }} ({{ $usedHours }}h used / sisa {{ $remaining }}h)
+                        </option>
+                      @endforeach
+                    </select>
+                </div>
+
+                <!-- Select Vehicle -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Pilih Kendaraan</label>
+                    <select :name="'assignments['+index+'][vehicle_id]'" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="">-- pilih kendaraan --</option>
+                        <template x-for="v in availableVehicles" :key="v.id">
+                            <option :value="v.id" x-text="v.text"></option>
+                        </template>
+                    </select>
+                    <p x-show="availableVehicles.length === 0 && !isLoading && orderId" class="text-xs text-red-500 mt-1">Tidak ada kendaraan tersedia atau belum dimuat.</p>
+                </div>
+
+                <!-- Select Guide -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Pilih Guide (opsional)</label>
+                    <select :name="'assignments['+index+'][guide_id]'" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                      <option value="">-- tidak ada --</option>
+                      @foreach($guides as $g)
+                        @php
+                          $schedule = $guideSchedules[$g->id] ?? null;
+                          $totalHours = (int) ($schedule->total_hours ?? $g->monthly_work_limit ?? 200);
+                          $usedHours  = (float) ($schedule->used_hours ?? 0);
+                          $remaining  = max(0, $totalHours - $usedHours);
+                        @endphp
+                        <option value="{{ $g->id }}" @if($remaining <= 0) disabled @endif>
+                          {{ $g->name }} ({{ $usedHours }} / {{ $totalHours }} jam)
+                        </option>
+                      @endforeach
+                    </select>
+                </div>
+
+                <!-- Note -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Catatan</label>
+                    <input type="text" :name="'assignments['+index+'][note]'" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Catatan khusus...">
+                </div>
+             </div>
+         </div>
+      </template>
+      
+      <div x-show="!orderId" class="col-span-1 md:col-span-2 text-center py-8 text-gray-500 border border-dashed rounded bg-gray-50">
+          Silakan pilih order terlebih dahulu.
       </div>
 
-      {{-- Catatan --}}
-      <div>
-        <label class="block text-sm font-medium text-gray-700">Catatan</label>
-        <input
-          name="note"
-          value="{{ old('note') }}"
-          class="mt-1 block w-full rounded border-gray-200 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-          placeholder="Opsional"
-        />
-      </div>
     </div>
 
-    <div class="pt-2">
-      <button
-        class="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-      >
-        Buat Assignment
-      </button>
-      <a
-        href="{{ route('assignments.index') }}"
-        class="ml-2 px-4 py-2 bg-gray-200 rounded text-sm hover:bg-gray-300"
-      >
-        Batal
-      </a>
+    <div class="pt-6 border-t flex justify-end space-x-3">
+      <a href="{{ route('assignments.index') }}" class="px-5 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-medium my-auto">Batal</a>
+      <button type="submit" class="px-5 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow font-medium" :disabled="isLoading || !orderId">Buat Assignment</button>
     </div>
   </form>
 </div>
+
+@push('scripts')
+<script>
+function assignmentForm() {
+    return {
+        orderId: '{{ old('order_id', $order->id ?? '') }}',
+        isLoading: false,
+        vehicleCount: 0,
+        // Initialize items from old input if valid, otherwise empty array
+        items: @json(old('assignments', [])), 
+        availableVehicles: [],
+
+        init() {
+            // Need to ensure items is array (it might be object if indices are keys)
+            if (typeof this.items === 'object' && this.items !== null && !Array.isArray(this.items)) {
+                this.items = Object.values(this.items);
+            }
+            if (!Array.isArray(this.items)) this.items = [];
+
+            if (this.orderId) {
+                // Fetch info. If items populated (old data), don't reset them.
+                this.fetchOrderDetails(this.items.length === 0);
+            }
+        },
+
+        fetchOrderDetails(resetItems = true) {
+            if (!this.orderId) {
+                this.items = [];
+                this.vehicleCount = 0;
+                this.availableVehicles = [];
+                return;
+            }
+
+            this.isLoading = true;
+            fetch(`{{ route('assignments.check-vehicle') }}?order_id=${this.orderId}`)
+                .then(res => res.json())
+                .then(data => {
+                    this.availableVehicles = data.vehicles || [];
+                    this.vehicleCount = data.vehicle_count || 1;
+                    
+                    if (resetItems) {
+                        // Create initial empty rows
+                        this.items = Array.from({ length: this.vehicleCount }, () => ({
+                            driver_id: '',
+                            vehicle_id: '',
+                            guide_id: '',
+                            note: ''
+                        }));
+                    }
+                    
+                    this.isLoading = false;
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert('Gagal mengambil detail order.');
+                    this.isLoading = false;
+                });
+        }
+    }
+}
+</script>
+@endpush
 @endsection

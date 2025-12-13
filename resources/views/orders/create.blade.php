@@ -3,17 +3,26 @@
 @section('content')
 @include('partials.flash-and-modal')
 
-<div class="max-w-3xl mx-auto p-4">
-  <div class="flex items-center justify-between mb-4">
-    <h1 class="text-2xl font-semibold">Buat Order</h1>
-    <a href="{{ route('orders.index') }}" class="px-3 py-2 bg-gray-200 rounded">Kembali</a>
+<div class="max-w-4xl mx-auto p-6" 
+     x-data="orderForm({ 
+        products: {{ $products->toJson() }}, 
+        oldProductId: '{{ old('product_id') }}', 
+        oldBranchId: '{{ old('product_branch_id') }}',
+        oldVehicleType: '{{ old('vehicle_type') }}',
+        oldVehicleCount: '{{ old('vehicle_count', 1) }}',
+        oldDuration: '{{ old('estimated_duration_minutes') }}'
+     })">
+     
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-gray-800">Buat Order Baru</h1>
+    <a href="{{ route('orders.index') }}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Kembali</a>
   </div>
 
-  <form id="orderForm" action="{{ route('orders.store') }}" method="POST" class="bg-white p-4 rounded shadow">
+  <form action="{{ route('orders.store') }}" method="POST" class="bg-white p-6 rounded-lg shadow-md space-y-6">
     @csrf
 
     @if($errors->any())
-      <div class="mb-3 p-3 bg-red-50 text-red-700 rounded">
+      <div class="p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded">
         <ul class="list-disc pl-5">
           @foreach($errors->all() as $err)
             <li>{{ $err }}</li>
@@ -22,355 +31,281 @@
       </div>
     @endif
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-      <div>
-        <label class="block text-sm">Nama Customer</label>
-        <input name="customer_name" value="{{ old('customer_name') }}" required class="mt-1 block w-full rounded border-gray-200" />
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      
+      <!-- Customer Info -->
+      <div class="space-y-4">
+        <h3 class="text-lg font-semibold border-b pb-2">Data Pelanggan</h3>
+        <div>
+           <label class="block text-sm font-medium text-gray-700">Nama Customer</label>
+           <input type="text" name="customer_name" value="{{ old('customer_name') }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Email</label>
+                <input type="email" name="email" value="{{ old('email') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Telepon</label>
+                <input type="text" name="phone" value="{{ old('phone') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+            </div>
+        </div>
       </div>
 
-      <div>
-        <label class="block text-sm">Email</label>
-        <input name="email" value="{{ old('email') }}" type="email" class="mt-1 block w-full rounded border-gray-200" />
+      <!-- Service Info -->
+      <div class="space-y-4">
+        <h3 class="text-lg font-semibold border-b pb-2">Layanan & Rute</h3>
+        
+        <!-- Product Selection -->
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Pilih Layanan / Product</label>
+            <select name="product_id" x-model="productId" @change="handleProductChange()" required
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                <option value="">-- Pilih Product --</option>
+                <template x-for="p in products" :key="p.id">
+                    <option :value="p.id" x-text="p.name"></option>
+                </template>
+            </select>
+        </div>
+
+        <!-- Branch Selection (Dynamic) -->
+        <div x-show="availableBranches.length > 0" x-transition>
+            <label class="block text-sm font-medium text-gray-700">Pilih Rute / Cabang</label>
+            <select name="product_branch_id" x-model="branchId" @change="handleBranchChange()"
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                <option value="">-- Pilih Rute --</option>
+                <template x-for="b in availableBranches" :key="b.id">
+                    <option :value="b.id" x-text="b.name + ' (' + formatDuration(b.duration_minutes) + ')'"></option>
+                </template>
+            </select>
+        </div>
+        
+        <!-- Exclusive Benefits Info -->
+        <div x-show="currentProduct && currentProduct.is_exclusive" x-transition class="bg-indigo-50 p-3 rounded border border-indigo-100 text-sm text-indigo-800">
+            <strong>✨ Fasilitas Eksklusif:</strong>
+            <ul class="list-disc pl-5 mt-1">
+                <template x-if="currentProduct.snack"><li x-text="'Snack'"></li></template>
+                <template x-if="currentProduct.water"><li x-text="'Air Mineral'"></li></template>
+                <template x-if="currentProduct.magazine"><li x-text="'Majalah'"></li></template>
+            </ul>
+        </div>
       </div>
 
-      <div>
-        <label class="block text-sm">Telepon</label>
-        <input name="phone" value="{{ old('phone') }}" class="mt-1 block w-full rounded border-gray-200" />
+      <!-- Time & Location -->
+      <div class="space-y-4">
+        <h3 class="text-lg font-semibold border-b pb-2">Waktu & Lokasi</h3>
+        
+        <div>
+           <label class="block text-sm font-medium text-gray-700">Waktu Penjemputan</label>
+           <input type="datetime-local" name="pickup_time" x-model="pickupTime" @change="recalcArrival" required 
+                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+        </div>
+        
+        <div>
+           <label class="block text-sm font-medium text-gray-700">Waktu Sampai (Opsional)</label>
+           <input type="datetime-local" name="arrival_time" x-model="arrivalTime" @change="recalcDuration" 
+                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Estimasi Durasi (Menit)</label>
+            <div class="flex items-center">
+                <input type="number" name="estimated_duration_minutes" x-model="duration" @input="recalcArrival" min="1" 
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <span class="ml-2 text-sm text-gray-500" x-text="formatDuration(duration)"></span>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">Otomatis dari Rute atau Waktu.</p>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Lokasi Jemput</label>
+            <input type="text" name="pickup_location" value="{{ old('pickup_location') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Tujuan</label>
+            <input type="text" name="destination" value="{{ old('destination') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+        </div>
       </div>
 
-      <div>
-        <label class="block text-sm">Product</label>
-        <select id="productSelect" name="product_id" class="mt-1 block w-full rounded border-gray-200">
-          <option value="">-- pilih product --</option>
-          @foreach($products as $p)
-            <option value="{{ $p->id }}" @if(old('product_id') == $p->id) selected @endif data-hour="{{ $p->hour ?? 0 }}" data-capacity="{{ $p->capacity ?? 0 }}">{{ $p->name }}</option>
-          @endforeach
-        </select>
+      <!-- Passengers & Vehicle -->
+      <div class="space-y-4">
+        <h3 class="text-lg font-semibold border-b pb-2">Penumpang & Kendaraan</h3>
+        
+        <div class="grid grid-cols-3 gap-3">
+            <div>
+                <label class="block text-xs font-medium text-gray-700">Dewasa</label>
+                <input type="number" name="adults" x-model.number="adults" @input="updatePassengers" min="0" class="mt-1 w-full rounded-md border-gray-300 shadow-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700">Anak</label>
+                <input type="number" name="children" x-model.number="children" @input="updatePassengers" min="0" class="mt-1 w-full rounded-md border-gray-300 shadow-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700">Bayi</label>
+                <input type="number" name="babies" x-model.number="babies" @input="updatePassengers" min="0" class="mt-1 w-full rounded-md border-gray-300 shadow-sm">
+            </div>
+        </div>
+        <input type="hidden" name="passengers" x-model="totalPassengers">
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Jenis Kendaraan</label>
+            <select name="vehicle_type" x-model="vehicleType" @change="handleVehicleTypeChange" 
+                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                <option value="">-- Pilih Jenis --</option>
+                @php
+                  // Simple capacity map matching JS logic
+                  $getCapacity = function($t) {
+                      $t = strtolower($t);
+                      if (str_contains($t, 'hiace') || str_contains($t, 'elf')) return 12;
+                      if (str_contains($t, 'bus')) return 24;
+                      if (str_contains($t, 'innova') || str_contains($t, 'apv') || str_contains($t, 'avanza')) return 6;
+                      if (str_contains($t, 'alphard')) return 5;
+                      return 4; 
+                  };
+                @endphp
+                @foreach($vehicleTypes as $type)
+                    <option value="{{ $type }}">{{ $type }} (Max {{ $getCapacity($type) }} pax)</option>
+                @endforeach
+            </select>
+            <p class="text-xs text-gray-500 mt-1">Pilih jenis untuk estimasi jumlah mobil.</p>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Jumlah Mobil Dibutuhkan</label>
+            <input type="number" name="vehicle_count" x-model="vehicleCount" min="1" 
+                   class="mt-1 block w-full rounded-md border-gray-300 bg-gray-50 shadow-sm font-semibold text-blue-800" readonly>
+            <p class="text-xs text-gray-500 mt-1">Dihitung otomatis berdasarkan kapasitas jenis mobil.</p>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-gray-700">Catatan</label>
+            <textarea name="note" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">{{ old('note') }}</textarea>
+        </div>
       </div>
 
-      <div>
-        <label class="block text-sm">Waktu Penjemputan</label>
-        <input id="pickup_time" name="pickup_time" value="{{ old('pickup_time') }}" type="datetime-local" class="mt-1 block w-full rounded border-gray-200" />
-      </div>
-
-      <div>
-        <label class="block text-sm">Waktu Sampai (opsional)</label>
-        <input id="arrival_time" name="arrival_time" value="{{ old('arrival_time') }}" type="datetime-local" class="mt-1 block w-full rounded border-gray-200" />
-      </div>
-
-      <div>
-        <label class="block text-sm">Estimasi Durasi (menit)</label>
-        <input id="estimated_duration_minutes" name="estimated_duration_minutes" value="{{ old('estimated_duration_minutes') }}" type="number" min="0" class="mt-1 block w-full rounded border-gray-200" readonly />
-        <div class="text-xs text-gray-500 mt-1">Diisi otomatis dari waktu penjemputan & waktu sampai, ditambah durasi product (hour × 60). Anda bisa edit jika perlu.</div>
-      </div>
-
-      <div>
-        <label class="block text-sm">Jumlah Mobil (opsional)</label>
-        <input name="vehicle_count" value="{{ old('vehicle_count',1) }}" type="number" min="1" class="mt-1 block w-full rounded border-gray-200" />
-      </div>
-
-      <div>
-        <label class="block text-sm">Jumlah Dewasa</label>
-        <input id="adults" name="adults" value="{{ old('adults',1) }}" type="number" min="0" class="mt-1 block w-full rounded border-gray-200" />
-      </div>
-
-      <div>
-        <label class="block text-sm">Jumlah Anak-anak</label>
-        <input id="children" name="children" value="{{ old('children',0) }}" type="number" min="0" class="mt-1 block w-full rounded border-gray-200" />
-      </div>
-
-      <div>
-        <label class="block text-sm">Jumlah Bayi</label>
-        <input id="babies" name="babies" value="{{ old('babies',0) }}" type="number" min="0" class="mt-1 block w-full rounded border-gray-200" />
-      </div>
-
-      <div class="md:col-span-2">
-        <div id="capacityInfo" class="text-sm text-gray-600">Capacity product: <span id="capValue">-</span></div>
-        <div id="capacityWarning" class="mt-1 p-2 bg-yellow-50 text-yellow-800 rounded hidden"></div>
-      </div>
-
-      <div class="md:col-span-2">
-        <label class="block text-sm">Tempat Penjemputan</label>
-        <input name="pickup_location" value="{{ old('pickup_location') }}" class="mt-1 block w-full rounded border-gray-200" />
-      </div>
-
-      <div class="md:col-span-2">
-        <label class="block text-sm">Tempat Tujuan</label>
-        <input name="destination" value="{{ old('destination') }}" class="mt-1 block w-full rounded border-gray-200" />
-      </div>
-
-      <div class="md:col-span-2">
-        <label class="block text-sm">Catatan</label>
-        <textarea name="note" class="mt-1 block w-full rounded border-gray-200" rows="3">{{ old('note') }}</textarea>
-      </div>
     </div>
 
-    <input id="passengers" type="hidden" name="passengers" value="{{ old('passengers', (old('adults',1) + old('children',0) + old('babies',0)) ) }}" />
-
-    <div class="mt-4 flex items-center space-x-2">
-      <button id="submitBtn" class="px-4 py-2 bg-blue-600 text-white rounded">Buat Order</button>
-      <a href="{{ route('orders.index') }}" class="px-4 py-2 bg-gray-200 rounded">Batal</a>
+    <div class="flex justify-end pt-6 border-t">
+      <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-md shadow hover:bg-blue-700 font-medium">Buat Order</button>
     </div>
   </form>
 </div>
 
-
 <script>
-  (function () {
-    const adultsEl = document.getElementById('adults');
-    const childrenEl = document.getElementById('children');
-    const babiesEl = document.getElementById('babies');
-    const passengersEl = document.getElementById('passengers');
+function orderForm(data) {
+    return {
+        products: data.products,
+        productId: data.oldProductId || '',
+        branchId: data.oldBranchId || '',
+        vehicleType: data.oldVehicleType || '',
+        pickupTime: '{{ old('pickup_time') }}',
+        arrivalTime: '{{ old('arrival_time') }}',
+        duration: data.oldDuration || 0,
+        
+        adults: {{ old('adults', 1) }},
+        children: {{ old('children', 0) }},
+        babies: {{ old('babies', 0) }},
+        totalPassengers: {{ old('passengers', 1) }},
+        vehicleCount: data.oldVehicleCount,
 
-    const pickupEl = document.getElementById('pickup_time');
-    const arrivalEl = document.getElementById('arrival_time');
-    const durationEl = document.getElementById('estimated_duration_minutes');
+        get currentProduct() {
+            return this.products.find(p => p.id == this.productId) || null;
+        },
 
-    const productSelect = document.getElementById('productSelect');
+        get availableBranches() {
+            const p = this.currentProduct;
+            return p && p.branches ? p.branches : [];
+        },
+        
+        get currentBranch() {
+            if (!this.branchId) return null;
+            return this.availableBranches.find(b => b.id == this.branchId) || null;
+        },
 
-    const capValueEl = document.getElementById('capValue');
-    const capacityWarningEl = document.getElementById('capacityWarning');
-    const capacityInfoEl = document.getElementById('capacityInfo');
+        init() {
+            this.updatePassengers();
+            if (this.productId) this.handleProductChange(false); // Init without reset
+        },
 
-    const form = document.getElementById('orderForm');
-    const submitBtn = document.getElementById('submitBtn');
-
-    const productHours = @json($products->pluck('hour','id')) || {};
-    const productCaps = @json($products->pluck('capacity','id')) || {};
-
-    function parseDateTimeLocal(value) {
-      if (!value) return null;
-      const d = new Date(value);
-      if (isNaN(d.getTime())) return null;
-      return d;
-    }
-
-    function updatePassengers() {
-      const adults = parseInt(adultsEl.value, 10) || 0;
-      const children = parseInt(childrenEl.value, 10) || 0;
-      const babies = parseInt(babiesEl.value, 10) || 0;
-      const total = adults + children + babies;
-      passengersEl.value = total;
-      return total;
-    }
-
-    function computeBaseDurationMinutes() {
-      const pickup = parseDateTimeLocal(pickupEl.value);
-      const arrival = parseDateTimeLocal(arrivalEl.value);
-      if (pickup && arrival) {
-        const diffMs = arrival.getTime() - pickup.getTime();
-        const diffMin = Math.round(diffMs / 60000);
-        return diffMin >= 0 ? diffMin : null;
-      }
-      const storedBase = durationEl.dataset.baseMinutes;
-      if (storedBase) return parseInt(storedBase, 10);
-      const current = parseInt(durationEl.value, 10);
-      return isNaN(current) ? null : current;
-    }
-
-    function updateDurationFromTimes() {
-      const base = computeBaseDurationMinutes();
-      if (base !== null) {
-        durationEl.dataset.baseMinutes = base;
-        const added = parseInt(durationEl.dataset.addedMinutes || '0', 10) || 0;
-        durationEl.value = Math.max(0, base + added);
-      } else {
-        delete durationEl.dataset.baseMinutes;
-      }
-    }
-
-    function handleProductChange() {
-      const selectedId = productSelect.value;
-      let hour = 0;
-      if (selectedId) {
-        hour = parseFloat(productHours[selectedId] ?? productSelect.querySelector(`option[value="${selectedId}"]`)?.dataset?.hour ?? 0) || 0;
-      }
-      const newAdded = Math.round(hour * 60);
-
-      const prevAdded = parseInt(durationEl.dataset.addedMinutes || '0', 10) || 0;
-
-      let base = null;
-      if (typeof durationEl.dataset.baseMinutes !== 'undefined') {
-        base = parseInt(durationEl.dataset.baseMinutes || '0', 10);
-      } else {
-        const current = parseInt(durationEl.value, 10);
-        if (!isNaN(current)) {
-          base = current - prevAdded;
-          if (base < 0) base = 0;
-          durationEl.dataset.baseMinutes = base;
-        }
-      }
-
-      if (base === null || isNaN(base)) {
-        base = 0;
-        durationEl.dataset.baseMinutes = base;
-      }
-
-      const total = Math.max(0, base + newAdded);
-      durationEl.value = total;
-
-      durationEl.dataset.addedMinutes = newAdded;
-      durationEl.dataset.addedProductId = selectedId || '';
-
-      applyCapacityLimitsForProduct(selectedId);
-    }
-
-    function applyCapacityLimitsForProduct(productId) {
-      const cap = productId ? parseInt(productCaps[productId] ?? productSelect.querySelector(`option[value="${productId}"]`)?.dataset?.capacity ?? 0, 10) : 0;
-      if (cap && cap > 0) {
-        capValueEl.textContent = cap;
-        adultsEl.max = cap;
-        childrenEl.max = cap;
-        babiesEl.max = cap;
-      } else {
-        capValueEl.textContent = '-';
-        adultsEl.removeAttribute('max');
-        childrenEl.removeAttribute('max');
-        babiesEl.removeAttribute('max');
-      }
-
-      const adultsVal = parseInt(adultsEl.value, 10) || 0;
-      const childrenVal = parseInt(childrenEl.value, 10) || 0;
-      const babiesVal = parseInt(babiesEl.value, 10) || 0;
-      let total = adultsVal + childrenVal + babiesVal;
-
-      if (cap && total > cap) {
-        let excess = total - cap;
-        const reducibleChildren = Math.min(childrenVal, excess);
-        if (reducibleChildren > 0) {
-          childrenEl.value = Math.max(0, childrenVal - reducibleChildren);
-          excess -= reducibleChildren;
-        }
-        if (excess > 0) {
-          const reducibleBabies = Math.min(babiesVal, excess);
-          if (reducibleBabies > 0) {
-            babiesEl.value = Math.max(0, babiesVal - reducibleBabies);
-            excess -= reducibleBabies;
-          }
-        }
-        if (excess > 0) {
-          adultsEl.value = Math.max(0, adultsVal - excess);
-          excess = 0;
-        }
-
-        showCapacityWarning('Jumlah penumpang melebihi kapasitas product, kami menyesuaikan nilai agar sesuai kapasitas.');
-      } else {
-        hideCapacityWarning();
-      }
-
-      updatePassengers();
-    }
-
-    function showCapacityWarning(msg) {
-      capacityWarningEl.textContent = msg;
-      capacityWarningEl.classList.remove('hidden');
-    }
-    function hideCapacityWarning() {
-      capacityWarningEl.textContent = '';
-      capacityWarningEl.classList.add('hidden');
-    }
-
-    function updateDuration() {
-      const pickup = parseDateTimeLocal(pickupEl.value);
-      const arrival = parseDateTimeLocal(arrivalEl.value);
-
-      if (pickup && arrival) {
-        const diffMs = arrival.getTime() - pickup.getTime();
-        const diffMin = Math.round(diffMs / 60000);
-        if (diffMin >= 0) {
-          durationEl.dataset.baseMinutes = diffMin;
-        } else {
-          delete durationEl.dataset.baseMinutes;
-          durationEl.value = '';
-          return;
-        }
-      }
-
-      const added = parseInt(durationEl.dataset.addedMinutes || '0', 10) || 0;
-      const baseVal = parseInt(durationEl.dataset.baseMinutes || '0', 10) || 0;
-      durationEl.value = Math.max(0, baseVal + added);
-    }
-
-    [adultsEl, childrenEl, babiesEl].forEach(el => {
-      if (!el) return;
-      el.addEventListener('input', function () {
-        const maxAttr = el.getAttribute('max');
-        if (maxAttr) {
-          const maxVal = parseInt(maxAttr, 10);
-          const cur = parseInt(el.value, 10) || 0;
-          if (cur > maxVal) {
-            el.value = maxVal;
-            showCapacityWarning('Nilai telah dibatasi sesuai kapasitas product.');
-          } else {
-            const total = updatePassengers();
-            const cap = parseInt(productCaps[productSelect.value] ?? 0, 10) || 0;
-            if (cap && total > cap) {
-              showCapacityWarning('Jumlah penumpang melebihi kapasitas product.');
-            } else {
-              hideCapacityWarning();
+        handleProductChange(resetBranch = true) {
+            if (resetBranch) {
+                this.branchId = '';
+                this.duration = 0;
             }
-          }
-        } else {
-          hideCapacityWarning();
+            if (!this.duration && this.currentProduct) {
+                // Fallback to legacy hour
+                this.duration = Math.round(this.currentProduct.hour * 60);
+            }
+        },
+
+        handleBranchChange() {
+            if (this.currentBranch) {
+                this.duration = this.currentBranch.duration_minutes;
+                this.recalcArrival();
+            }
+        },
+
+        updatePassengers() {
+            this.totalPassengers = (parseInt(this.adults)||0) + (parseInt(this.children)||0) + (parseInt(this.babies)||0);
+            this.recalcVehicleCount();
+        },
+
+        handleVehicleTypeChange() {
+            this.recalcVehicleCount();
+        },
+
+        recalcVehicleCount() {
+            let cap = 4; // Default standard car (Avanza/Generic)
+            const type = (this.vehicleType || '').toLowerCase();
+            
+            if (type.includes('hiace') || type.includes('elf')) cap = 12;
+            else if (type.includes('bus')) cap = 24;
+            else if (type.includes('innova')) cap = 6;
+            else if (type.includes('apv') || type.includes('avanza')) cap = 6;
+            
+            this.vehicleCount = Math.max(1, Math.ceil(this.totalPassengers / cap));
+        },
+
+        recalcArrival() { // Recalculate Arrival based on Pickup + Duration
+             if (this.pickupTime && this.duration) {
+                const start = new Date(this.pickupTime);
+                const durationMs = parseInt(this.duration) * 60000;
+                const end = new Date(start.getTime() + durationMs);
+                
+                // Format to YYYY-MM-DDTHH:mm
+                const year = end.getFullYear();
+                const month = String(end.getMonth() + 1).padStart(2, '0');
+                const day = String(end.getDate()).padStart(2, '0');
+                const hours = String(end.getHours()).padStart(2, '0');
+                const minutes = String(end.getMinutes()).padStart(2, '0');
+                
+                this.arrivalTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+             }
+        },
+
+        recalcDuration() {
+            if (this.pickupTime && this.arrivalTime) {
+                const start = new Date(this.pickupTime);
+                const end = new Date(this.arrivalTime);
+                if (end > start) {
+                    const diffMs = end - start;
+                    const diffMins = Math.round(diffMs / 60000);
+                    // Only update if no branch selected or explicit override desired?
+                    // Let's assume time takes precedence if explicitly set
+                    this.duration = diffMins;
+                }
+            } else if (this.currentBranch) {
+                this.duration = this.currentBranch.duration_minutes;
+            }
+        },
+        
+        formatDuration(mins) {
+            if (!mins) return '-';
+            const h = Math.floor(mins / 60);
+            const m = mins % 60;
+            return (h > 0 ? h + ' Jam ' : '') + (m > 0 ? m + ' Menit' : '');
         }
-        updatePassengers();
-      });
-    });
-
-    [pickupEl, arrivalEl].forEach(el => {
-      if (!el) return;
-      el.addEventListener('change', updateDuration);
-      el.addEventListener('input', updateDuration);
-    });
-
-    if (productSelect) {
-      productSelect.addEventListener('change', function () {
-        handleProductChange();
-      });
     }
-
-    document.addEventListener('DOMContentLoaded', function () {
-      updatePassengers();
-      updateDuration();
-      if (productSelect && productSelect.value) {
-        applyCapacityLimitsForProduct(productSelect.value);
-      } else {
-        capValueEl.textContent = '-';
-      }
-      if (productSelect) handleProductChange();
-    });
-
-    form.addEventListener('submit', function (e) {
-      updatePassengers();
-      updateDuration();
-
-      const passengersVal = parseInt(passengersEl.value, 10) || 0;
-      if (passengersVal <= 0) {
-        e.preventDefault();
-        alert('Jumlah penumpang harus lebih dari 0.');
-        return false;
-      }
-
-      const cap = parseInt(productCaps[productSelect.value] ?? 0, 10) || 0;
-      if (cap && passengersVal > cap) {
-        e.preventDefault();
-        alert('Total penumpang melebihi kapasitas product. Sesuaikan jumlah penumpang atau pilih product lain.');
-        return false;
-      }
-
-      const pickup = parseDateTimeLocal(pickupEl.value);
-      const arrival = parseDateTimeLocal(arrivalEl.value);
-      if (pickup && arrival) {
-        const diffMin = Math.round((arrival.getTime() - pickup.getTime()) / 60000);
-        if (diffMin < 0) {
-          e.preventDefault();
-          alert('Waktu sampai lebih awal dari waktu penjemputan. Periksa input waktu.');
-          return false;
-        }
-      }
-    });
-
-  })();
+}
 </script>
-
 @endsection

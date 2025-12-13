@@ -47,6 +47,8 @@ class DashboardController extends Controller
             $monthlyOrders        = $this->getMonthlyOrdersLast12Months($now);
             $productDistribution  = $this->getProductDistributionThisMonth($startOfMonth, $endOfMonth);
             $topDrivers           = $this->getTopDriversThisMonth($year, $month);
+            $todaysTasks          = $this->getTodaysTasks(); // <-- Fetch
+            $todaysOrders         = $this->getTodaysOrders(); // <-- Fetch today's orders
             $availableYears       = $this->getAvailableYears();
 
 // order notifikasi
@@ -65,6 +67,8 @@ class DashboardController extends Controller
                 'month',
                 'year',
                 'availableYears',
+                'todaysTasks', // <-- dikirim ke Blade
+                'todaysOrders', // <-- dikirim ke Blade
                 'lastOrderId'   // <-- dikirim ke Blade
             ));
         } catch (\Throwable $e) {
@@ -92,7 +96,7 @@ class DashboardController extends Controller
 
         return DB::table('assignments')
             ->whereBetween('assigned_at', [$start, $end])
-            ->where('status', 'accepted')
+            ->whereIn('status', ['accepted', 'in_progress'])
             ->count();
     }
 
@@ -215,6 +219,52 @@ class DashboardController extends Controller
         return $topDrivers;
     }
 
+    private function getTodaysTasks()
+    {
+        if (!Schema::hasTable('assignments')) return collect();
+
+        // Tasks for today: 
+        // 1. Pending tasks assigned for Order pickup today.
+        // 2. Accepted tasks (in progress) regardless of date (or maybe just today?).
+        // User request: "Todays task" + "In progress juga muncul".
+        // Let's get assignments linked to Orders with pickup_time today OR status=accepted.
+        
+        $todayStart = Carbon::today();
+        $todayEnd = Carbon::today()->endOfDay();
+
+        return Assignment::with(['order.product', 'driver', 'vehicle'])
+            ->where(function($q) use ($todayStart, $todayEnd) {
+                 // Condition 1: Accepted or In Progress
+                 $q->whereIn('status', ['accepted', 'in_progress'])
+                 // Condition 2: Pending/Assigned tasks with Order Pickup Today.
+                   ->orWhere(function($q2) use ($todayStart, $todayEnd) {
+                       $q2->where('status', 'pending')
+                          ->whereHas('order', function($q3) use ($todayStart, $todayEnd) {
+                              $q3->whereBetween('pickup_time', [$todayStart, $todayEnd]);
+                          });
+                   });
+            })
+            ->orderBy('status', 'asc') // accepted first? 'accepted' comes before 'pending' alphabetically? a-p. Yes.
+            // Or sort by order pickup time?
+            ->get()
+            ->sortBy(function($t) {
+                return $t->order->pickup_time ?? $t->created_at;
+            });
+    }
+
+    private function getTodaysOrders()
+    {
+        if (!Schema::hasTable('orders')) return collect();
+
+        $todayStart = Carbon::today();
+        $todayEnd = Carbon::today()->endOfDay();
+
+        return Order::with(['product', 'assignments.driver', 'assignments.vehicle'])
+            ->whereBetween('pickup_time', [$todayStart, $todayEnd])
+            ->orderBy('pickup_time', 'asc')
+            ->get();
+    }
+
     private function getAvailableYears(): array
     {
         if (!Schema::hasTable('orders')) {
@@ -262,20 +312,27 @@ class DashboardController extends Controller
                 ->where('status', 'completed')
                 ->get();
 
-            $usedMinutes = 0;
-            foreach ($completedAssignments as $a) {
-                if ($a->workstart && $a->workend) {
-                    $usedMinutes += Carbon::parse($a->workstart)
-                        ->diffInMinutes(Carbon::parse($a->workend));
-                }
-            }
-            $usedHours = round($usedMinutes / 60, 1);
-
             // Work schedule untuk batas jam
             $workSchedule = WorkSchedule::where('user_id', $user->id)
                 ->where('month', $month)
                 ->where('year', $year)
                 ->first();
+
+            // Gunakan used_hours dari WorkSchedule jika ada
+            if ($workSchedule) {
+                $usedHours = (float) $workSchedule->used_hours;
+            } else {
+                // Fallback: hitung manual jika WorkSchedule belum ada
+                $usedMinutes = 0;
+                foreach ($completedAssignments as $a) {
+                     if ($a->started_at && $a->completed_at) {
+                        $usedMinutes += max(0, Carbon::parse($a->completed_at)->diffInMinutes(Carbon::parse($a->started_at)));
+                     } elseif ($a->workstart && $a->workend) { // Legacy fallback
+                        $usedMinutes += max(0, Carbon::parse($a->workend)->diffInMinutes(Carbon::parse($a->workstart)));
+                     }
+                }
+                $usedHours = round($usedMinutes / 60, 1);
+            }
 
             $totalHours = (int) ($workSchedule?->total_hours ?? $user->monthly_work_limit ?? 200);
 

@@ -16,6 +16,7 @@ class Order extends Model
         'arrival_time',
         'estimated_duration_minutes',
         'passengers',
+        'vehicle_type',
         'pickup_location',
         'destination',
         'product_id',
@@ -26,6 +27,7 @@ class Order extends Model
         'note',
         'created_by',
         'status',
+        'product_branch_id',
     ];
 
     protected $casts = [
@@ -42,6 +44,11 @@ class Order extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function productBranch(): BelongsTo
+    {
+        return $this->belongsTo(ProductBranch::class);
     }
 
     public function assignments(): HasMany

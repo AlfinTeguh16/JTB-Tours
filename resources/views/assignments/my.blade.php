@@ -118,35 +118,64 @@
       <div><strong>Pickup:</strong> <span x-text="payload.order && payload.order.pickup ? payload.order.pickup : '-'"></span></div>
       <div><strong>From → To:</strong> <span x-text="payload.order && payload.order.from ? payload.order.from : '-'"></span> → <span x-text="payload.order && payload.order.to ? payload.order.to : '-'"></span></div>
       <div><strong>Product:</strong> <span x-text="payload.order && payload.order.product ? payload.order.product : '-'"></span></div>
-      <div><strong>Driver:</strong> <span x-text="payload.driver && payload.driver.name ? payload.driver.name : '-'"></span> (<span x-text="payload.driver && payload.driver.id ? payload.driver.id : '-'"></span>)</div>
-      <div><strong>Guide:</strong> <span x-text="payload.guide && payload.guide.name ? payload.guide.name : '-'"></span> (<span x-text="payload.guide && payload.guide.id ? payload.guide.id : '-'"></span>)</div>
+      <div><strong>Driver:</strong> <span x-text="payload.driver && payload.driver.name ? payload.driver.name : '-'"></span></div>
+      <div><strong>Guide:</strong> <span x-text="payload.guide && payload.guide.name ? payload.guide.name : '-'"></span></div>
       <div><strong>Note:</strong> <span x-text="payload.note ? payload.note : '-'"></span></div>
       <div><strong>Status:</strong> <span x-text="payload.status ? payload.status : '-'"></span></div>
     </div>
 
     <div class="mt-4 flex items-center justify-end space-x-2">
       @auth
-      <template x-if="isCurrentPerformer() && ['pending','accepted'].includes(payload.status)">
+      <template x-if="isCurrentPerformer()">
         <div class="flex items-center space-x-2">
+            
+          {{-- PENDING: Terima / Tolak --}}
           <template x-if="payload.status === 'pending'">
-            <form x-bind:action="changeStatusUrl('accepted')" method="POST" x-ref="formAccept">
-              <input type="hidden" name="_token" value="{{ csrf_token() }}">
-              <input type="hidden" name="status" value="accepted">
-              <button type="button" @click="confirmAndSubmit($refs.formAccept)" class="px-3 py-2 bg-green-600 text-white rounded text-sm">Accept</button>
-            </form>
-            <form x-bind:action="changeStatusUrl('declined')" method="POST" x-ref="formDecline">
-              <input type="hidden" name="_token" value="{{ csrf_token() }}">
-              <input type="hidden" name="status" value="declined">
-              <button type="button" @click="confirmAndSubmit($refs.formDecline)" class="px-3 py-2 bg-red-600 text-white rounded text-sm">Decline</button>
-            </form>
+             <div class="flex space-x-2">
+                <form x-bind:action="changeStatusUrl('accepted')" method="POST" x-ref="formAccept">
+                  <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="status" value="accepted">
+                  <button type="button" @click="confirmAndSubmit($refs.formAccept, 'Terima tugas ini?')" class="px-3 py-2 bg-green-600 text-white rounded text-sm">Terima Tugas</button>
+                </form>
+                
+                <button type="button" @click="showRejectReason = true" class="px-3 py-2 bg-red-600 text-white rounded text-sm" x-show="!showRejectReason">Tolak</button>
+             </div>
           </template>
+
+          {{-- ACCEPTED: Mulai Jalan (In Progress) --}}
           <template x-if="payload.status === 'accepted'">
+             <form x-bind:action="changeStatusUrl('in_progress')" method="POST" x-ref="formStart">
+               <input type="hidden" name="_token" value="{{ csrf_token() }}">
+               <input type="hidden" name="status" value="in_progress">
+               <button type="button" @click="confirmAndSubmit($refs.formStart, 'Mulai kerjakan tugas (start job)?')" class="px-3 py-2 bg-blue-600 text-white rounded text-sm">Mulai Jalan / Kerjakan</button>
+             </form>
+          </template>
+
+          {{-- IN PROGRESS: Selesai --}}
+          <template x-if="payload.status === 'in_progress'">
             <form x-bind:action="changeStatusUrl('completed')" method="POST" x-ref="formCompleted">
               <input type="hidden" name="_token" value="{{ csrf_token() }}">
               <input type="hidden" name="status" value="completed">
-              <button type="button" @click="confirmAndSubmit($refs.formCompleted)" class="px-3 py-2 bg-blue-600 text-white rounded text-sm">Complete</button>
+              <button type="button" @click="confirmAndSubmit($refs.formCompleted, 'Tugas sudah selesai?')" class="px-3 py-2 bg-indigo-600 text-white rounded text-sm">Tugas Selesai</button>
             </form>
           </template>
+
+           {{-- Form Tolak (Hidden by default) --}}
+           <div x-show="showRejectReason" class="w-full mt-2" style="display:none;">
+             <div class="flex flex-col space-y-2 p-3 border border-red-200 rounded bg-red-50">
+                <p class="text-xs font-bold text-red-800">Alasan Penolakan:</p>
+                <form x-bind:action="changeStatusUrl('declined')" method="POST" x-ref="formDecline">
+                  <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="status" value="declined">
+                  <textarea name="rejection_reason" class="w-full text-sm border-gray-300 rounded mb-2" placeholder="Tulis alasan..." required rows="2"></textarea>
+                  <div class="flex space-x-2 justify-end">
+                      <button type="button" @click="showRejectReason = false" class="px-3 py-1 bg-gray-300 text-gray-700 rounded text-xs hover:bg-gray-400">Batal</button>
+                      <button type="button" @click="confirmAndSubmit($refs.formDecline, 'Yakin menolak tugas ini?')" class="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700">Kirim Penolakan</button>
+                  </div>
+                </form>
+             </div>
+           </div>
+
         </div>
       </template>
       @endauth
@@ -180,6 +209,7 @@
     return {
       open: false,
       payload: {},
+      showRejectReason: false,
       currentUserId: {!! json_encode(auth()->check() ? auth()->id() : null) !!},
       currentUserRole: {!! json_encode(auth()->check() ? auth()->user()->role : null) !!},
 
@@ -187,6 +217,7 @@
         window.addEventListener('open-assignment-modal', (e) => {
           this.payload = e.detail || {};
           this.open = true;
+          this.showRejectReason = false;
         });
       },
       close() {
@@ -202,8 +233,8 @@
       changeStatusUrl(status) {
         return `/assignments/${this.payload.id}/status`;
       },
-      confirmAndSubmit(formRef) {
-        if (!confirm('Yakin ingin melakukan aksi ini?')) return;
+      confirmAndSubmit(formRef, msg = 'Yakin ingin melakukan aksi ini?') {
+        if (!confirm(msg)) return;
         formRef.submit();
       }
     }

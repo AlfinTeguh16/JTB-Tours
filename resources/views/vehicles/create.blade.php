@@ -6,7 +6,7 @@
 <div class="max-w-2xl mx-auto p-4">
   <div class="flex items-center justify-between mb-4">
     <h1 class="text-2xl font-semibold">Tambah Kendaraan</h1>
-    <a href="{{ route('vehicles.index') }}" class="px-3 py-2 bg-gray-200 rounded">Kembali</a>
+    <x-secondary-button :href="route('vehicles.index')">Kembali</x-secondary-button>
   </div>
 
   <form action="{{ route('vehicles.store') }}" method="POST" class="bg-white p-4 rounded shadow">
@@ -54,8 +54,8 @@
     </div>
 
     <div class="mt-4">
-      <button class="px-4 py-2 bg-blue-600 text-white rounded">Simpan</button>
-      <a href="{{ route('vehicles.index') }}" class="ml-2 px-4 py-2 bg-gray-200 rounded">Batal</a>
+      <x-primary-button type="submit">Simpan</x-primary-button>
+      <x-secondary-button :href="route('vehicles.index')">Batal</x-secondary-button>
     </div>
   </form>
 </div>
