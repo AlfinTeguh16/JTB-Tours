@@ -4,11 +4,11 @@
 @include('partials.flash-and-modal')
 
 <div class="max-w-4xl mx-auto p-6" 
+<div class="max-w-4xl mx-auto p-6" 
      x-data="orderForm({ 
         products: {{ $products->toJson() }}, 
         oldProductId: '{{ old('product_id') }}', 
         oldBranchId: '{{ old('product_branch_id') }}',
-        oldVehicleType: '{{ old('vehicle_type') }}',
         oldVehicleCount: '{{ old('vehicle_count', 1) }}',
         oldDuration: '{{ old('estimated_duration_minutes') }}'
      })">
@@ -147,34 +147,13 @@
         </div>
         <input type="hidden" name="passengers" x-model="totalPassengers">
 
-        <div>
-            <label class="block text-sm font-medium text-gray-700">Jenis Kendaraan</label>
-            <select name="vehicle_type" x-model="vehicleType" @change="handleVehicleTypeChange" 
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                <option value="">-- Pilih Jenis --</option>
-                @php
-                  // Simple capacity map matching JS logic
-                  $getCapacity = function($t) {
-                      $t = strtolower($t);
-                      if (str_contains($t, 'hiace') || str_contains($t, 'elf')) return 12;
-                      if (str_contains($t, 'bus')) return 24;
-                      if (str_contains($t, 'innova') || str_contains($t, 'apv') || str_contains($t, 'avanza')) return 6;
-                      if (str_contains($t, 'alphard')) return 5;
-                      return 4; 
-                  };
-                @endphp
-                @foreach($vehicleTypes as $type)
-                    <option value="{{ $type }}">{{ $type }} (Max {{ $getCapacity($type) }} pax)</option>
-                @endforeach
-            </select>
-            <p class="text-xs text-gray-500 mt-1">Pilih jenis untuk estimasi jumlah mobil.</p>
-        </div>
+
 
         <div>
             <label class="block text-sm font-medium text-gray-700">Jumlah Mobil Dibutuhkan</label>
             <input type="number" name="vehicle_count" x-model="vehicleCount" min="1" 
-                   class="mt-1 block w-full rounded-md border-gray-300 bg-gray-50 shadow-sm font-semibold text-blue-800" readonly>
-            <p class="text-xs text-gray-500 mt-1">Dihitung otomatis berdasarkan kapasitas jenis mobil.</p>
+                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-semibold text-blue-800">
+            <p class="text-xs text-gray-500 mt-1">Dihitung otomatis (default 4 pax/mobil), silakan ubah jika perlu.</p>
         </div>
 
         <div>
@@ -195,9 +174,9 @@
 function orderForm(data) {
     return {
         products: data.products,
+        
         productId: data.oldProductId || '',
         branchId: data.oldBranchId || '',
-        vehicleType: data.oldVehicleType || '',
         pickupTime: '{{ old('pickup_time') }}',
         arrivalTime: '{{ old('arrival_time') }}',
         duration: data.oldDuration || 0,
@@ -236,6 +215,7 @@ function orderForm(data) {
                 // Fallback to legacy hour
                 this.duration = Math.round(this.currentProduct.hour * 60);
             }
+            this.recalcVehicleCount();
         },
 
         handleBranchChange() {
@@ -250,19 +230,12 @@ function orderForm(data) {
             this.recalcVehicleCount();
         },
 
-        handleVehicleTypeChange() {
-            this.recalcVehicleCount();
-        },
-
         recalcVehicleCount() {
-            let cap = 4; // Default standard car (Avanza/Generic)
-            const type = (this.vehicleType || '').toLowerCase();
-            
-            if (type.includes('hiace') || type.includes('elf')) cap = 12;
-            else if (type.includes('bus')) cap = 24;
-            else if (type.includes('innova')) cap = 6;
-            else if (type.includes('apv') || type.includes('avanza')) cap = 6;
-            
+            // Default capability: product capacity or 4
+            let cap = 4; 
+            if (this.currentProduct && this.currentProduct.capacity) {
+                cap = this.currentProduct.capacity;
+            }
             this.vehicleCount = Math.max(1, Math.ceil(this.totalPassengers / cap));
         },
 
@@ -290,8 +263,6 @@ function orderForm(data) {
                 if (end > start) {
                     const diffMs = end - start;
                     const diffMins = Math.round(diffMs / 60000);
-                    // Only update if no branch selected or explicit override desired?
-                    // Let's assume time takes precedence if explicitly set
                     this.duration = diffMins;
                 }
             } else if (this.currentBranch) {

@@ -15,6 +15,7 @@
     // Kelompokkan assignment berdasarkan status
     $pending = $assignments->where('status', 'pending');
     $accepted = $assignments->where('status', 'accepted');
+    $running  = $assignments->where('status', 'in_progress');
     $history = $assignments->whereIn('status', ['completed', 'declined']);
   @endphp
 
@@ -38,10 +39,30 @@
     @endif
   </div>
 
-  {{-- === Bagian 2: Tugas Diterima (Sedang Dikerjakan) === --}}
+  {{-- === Bagian 2: Tugas Saya Jalankan (Running) === --}}
   <div class="mb-8">
     <div class="flex items-center gap-2 mb-3">
-      <h2 class="text-lg font-medium text-gray-800">Tugas Diterima</h2>
+      <h2 class="text-lg font-medium text-gray-800">Tugas Berjalan</h2>
+      <span class="bg-indigo-100 text-indigo-800 text-xs px-2 py-0.5 rounded-full">
+        {{ $running->count() }}
+      </span>
+    </div>
+
+    @if($running->isNotEmpty())
+      <div class="space-y-3">
+        @foreach($running as $a)
+          @include('assignments._assignment-card', ['a' => $a, 'showActions' => true])
+        @endforeach
+      </div>
+    @else
+      <div class="text-sm text-gray-500 italic">Tidak ada tugas yang sedang berjalan.</div>
+    @endif
+  </div>
+
+  {{-- === Bagian 3: Tugas Diterima (Siap Dimulai) === --}}
+  <div class="mb-8">
+    <div class="flex items-center gap-2 mb-3">
+      <h2 class="text-lg font-medium text-gray-800">Tugas Diterima (Accepted)</h2>
       <span class="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full">
         {{ $accepted->count() }}
       </span>
@@ -54,7 +75,7 @@
         @endforeach
       </div>
     @else
-      <div class="text-sm text-gray-500 italic">Tidak ada tugas yang sedang dikerjakan.</div>
+      <div class="text-sm text-gray-500 italic">Tidak ada tugas yang diterima (menunggu dimulai).</div>
     @endif
   </div>
 
@@ -193,6 +214,7 @@
   }
   .status-pending { @apply bg-yellow-100 text-yellow-800; }
   .status-accepted { @apply bg-green-100 text-green-800; }
+  .status-in_progress { @apply bg-indigo-100 text-indigo-800; }
   .status-completed { @apply bg-blue-100 text-blue-800; }
   .status-declined { @apply bg-red-100 text-red-800; }
 </style>
@@ -239,6 +261,31 @@
       }
     }
   }
+
+  // Timer: Update live duration every second
+  function updateTimers() {
+      const timers = document.querySelectorAll('.live-timer');
+      const now = Math.floor(Date.now() / 1000);
+      
+      timers.forEach(el => {
+          const start = parseInt(el.getAttribute('data-start'));
+          if (!start) return;
+          
+          let diff = now - start;
+          if (diff < 0) diff = 0;
+          
+          const hours = Math.floor(diff / 3600);
+          const minutes = Math.floor((diff % 3600) / 60);
+          const seconds = diff % 60;
+          
+          el.innerText = 
+             String(hours).padStart(2, '0') + ':' +
+             String(minutes).padStart(2, '0') + ':' +
+             String(seconds).padStart(2, '0');
+      });
+  }
+  setInterval(updateTimers, 1000);
+  document.addEventListener('DOMContentLoaded', updateTimers);
 </script>
 @endpush
 

@@ -8,7 +8,6 @@
         products: {{ $products->toJson() }}, 
         currentProductId: {{ $order->product_id }},
         currentBranchId: {{ $order->product_branch_id ?? 'null' }},
-        currentVehicleType: '{{ $order->vehicle_type }}',
         currentVehicleCount: {{ $order->vehicle_count ?? 1 }},
         currentDuration: {{ $order->estimated_duration_minutes ?? 0 }},
         adults: {{ $order->adults ?? 0 }},
@@ -152,33 +151,13 @@
         </div>
         <input type="hidden" name="passengers" x-model="totalPassengers">
 
-        <div>
-            <label class="block text-sm font-medium text-gray-700">Jenis Kendaraan</label>
-            <select name="vehicle_type" x-model="vehicleType" @change="handleVehicleTypeChange" 
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                <option value="">-- Pilih Jenis --</option>
-                @php
-                  $getCapacity = function($t) {
-                      $t = strtolower($t);
-                      if (str_contains($t, 'hiace') || str_contains($t, 'elf')) return 12;
-                      if (str_contains($t, 'bus')) return 24;
-                      if (str_contains($t, 'innova') || str_contains($t, 'apv') || str_contains($t, 'avanza')) return 6;
-                      if (str_contains($t, 'alphard')) return 5;
-                      return 4; 
-                  };
-                @endphp
-                @foreach($vehicleTypes as $type)
-                    <option value="{{ $type }}" @if($order->vehicle_type == $type) selected @endif>{{ $type }} (Max {{ $getCapacity($type) }} pax)</option>
-                @endforeach
-            </select>
-            <p class="text-xs text-gray-500 mt-1">Pilih jenis untuk estimasi jumlah mobil.</p>
-        </div>
+
 
         <div>
             <label class="block text-sm font-medium text-gray-700">Jumlah Mobil Dibutuhkan</label>
             <input type="number" name="vehicle_count" x-model="vehicleCount" min="1" 
-                   class="mt-1 block w-full rounded-md border-gray-300 bg-gray-50 shadow-sm font-semibold text-blue-800" readonly>
-            <p class="text-xs text-gray-500 mt-1">Dihitung otomatis berdasarkan kapasitas jenis mobil.</p>
+                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-semibold text-blue-800">
+            <p class="text-xs text-gray-500 mt-1">Dihitung otomatis (default 4 pax/mobil), silakan ubah jika perlu.</p>
         </div>
 
         <div>
@@ -201,7 +180,6 @@ function orderEditForm(data) {
         products: data.products,
         productId: data.currentProductId,
         branchId: data.currentBranchId,
-        vehicleType: data.currentVehicleType,
         
         pickupTime: '{{ old('pickup_time', $order->pickup_time ? $order->pickup_time->format('Y-m-d\TH:i') : '') }}',
         arrivalTime: '{{ old('arrival_time', $order->arrival_time ? $order->arrival_time->format('Y-m-d\TH:i') : '') }}',
@@ -241,6 +219,7 @@ function orderEditForm(data) {
                 // Fallback
                 this.duration = Math.round(this.currentProduct.hour * 60);
             }
+            this.recalcVehicleCount();
         },
 
         handleBranchChange() {
@@ -255,19 +234,11 @@ function orderEditForm(data) {
             this.recalcVehicleCount();
         },
 
-        handleVehicleTypeChange() {
-            this.recalcVehicleCount();
-        },
-
         recalcVehicleCount() {
             let cap = 4; // Default
-            const type = (this.vehicleType || '').toLowerCase();
-            
-            if (type.includes('hiace') || type.includes('elf')) cap = 12;
-            else if (type.includes('bus')) cap = 24;
-            else if (type.includes('innova')) cap = 6;
-            else if (type.includes('apv') || type.includes('avanza')) cap = 6;
-            
+            if (this.currentProduct && this.currentProduct.capacity) {
+                cap = this.currentProduct.capacity;
+            }
             this.vehicleCount = Math.max(1, Math.ceil(this.totalPassengers / cap));
         },
 

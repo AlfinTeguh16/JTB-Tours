@@ -130,8 +130,7 @@ class OrderController extends Controller
             'pickup_location'            => 'nullable|string|max:255',
             'destination'                => 'nullable|string|max:255',
             'product_id'                 => 'required|exists:products,id',
-            'product_branch_id'          => 'nullable|exists:product_branches,id', // Added
-            'vehicle_type'               => 'nullable|string|max:50', // Added
+            'product_branch_id'          => 'nullable|exists:product_branches,id',
             'adults'                     => 'nullable|integer|min:0',
             'children'                   => 'nullable|integer|min:0',
             'babies'                     => 'nullable|integer|min:0',
@@ -158,17 +157,8 @@ class OrderController extends Controller
             // Let's assume Capacity in Product is "Default car capacity".
             // We will just calculate vehicle count here.
             
-            // Auto-calculate Vehicle Count
+            // Auto-calculate Vehicle Count if missing
             $vehicleCap = $product->capacity ?? 4; // Default fallback
-            // If vehicle type implies capacity, use that
-            // Simple mapping for calculation
-            if (!empty($validated['vehicle_type'])) {
-                $t = strtolower($validated['vehicle_type']);
-                if (str_contains($t, 'hiace') || str_contains($t, 'elf')) $vehicleCap = 12;
-                if (str_contains($t, 'bus')) $vehicleCap = 24;
-                if (str_contains($t, 'innova')) $vehicleCap = 6;
-                if (str_contains($t, 'avanza') || str_contains($t, 'apv')) $vehicleCap = 6;
-            }
             
             if (empty($validated['vehicle_count'])) {
                 $validated['vehicle_count'] = ceil($totalPassengers / max(1, $vehicleCap));
@@ -274,7 +264,6 @@ class OrderController extends Controller
             'destination'                => 'nullable|string|max:255',
             'product_id'                 => 'required|exists:products,id',
             'product_branch_id'          => 'nullable|exists:product_branches,id', // Added
-            'vehicle_type'               => 'nullable|string|max:50', // Added
             'adults'                     => 'nullable|integer|min:0',
             'children'                   => 'nullable|integer|min:0',
             'babies'                     => 'nullable|integer|min:0',

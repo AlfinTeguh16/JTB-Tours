@@ -188,4 +188,54 @@ class VehicleController extends Controller
             return redirect()->back()->with('error','Gagal memuat detail kendaraan.');
         }
     }
+    /**
+     * Check which vehicle types are available for a specific time slot.
+     */
+    public function checkAvailabilityTypes(Request $request)
+    {
+        $pickup = $request->query('pickup_time');
+        $duration = (int) $request->query('duration', 60);
+
+        if (!$pickup) {
+             return response()->json([]);
+        }
+
+        try {
+            $startTime = \Carbon\Carbon::parse($pickup);
+            $endTime = $startTime->copy()->addMinutes($duration);
+
+            // Logic: A type is available if at least ONE vehicle of that type is available.
+            // Strict check: No overlapping assignments (pending, accepted, in_progress).
+
+            $vehicles = Vehicle::where('status', '!=', 'maintenance')->get();
+            $availableTypes = [];
+
+            foreach ($vehicles as $v) {
+                // Check if this vehicle has any overlapping assignment
+                $hasOverlap = $v->assignments()
+                    ->whereIn('status', ['pending', 'accepted', 'in_progress'])
+                    ->whereHas('order', function ($q) use ($startTime, $endTime) {
+                        $q->where(function ($sub) use ($startTime, $endTime) {
+                            // Overlap: Order Start < Req End AND Order End > Req Start
+                            $sub->where('pickup_time', '<', $endTime)
+                                ->whereRaw("DATE_ADD(pickup_time, INTERVAL COALESCE(estimated_duration_minutes, 60) MINUTE) > ?", [$startTime]);
+                        });
+                    })
+                    ->exists();
+
+                if (!$hasOverlap) {
+                    $availableTypes[] = $v->type;
+                }
+            }
+
+            $types = array_values(array_unique($availableTypes));
+            sort($types);
+
+            return response()->json($types);
+
+        } catch (\Throwable $e) {
+            Log::error('Vehicle.checkAvailabilityTypes error: ' . $e->getMessage());
+            return response()->json([]);
+        }
+    }
 }

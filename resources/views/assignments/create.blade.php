@@ -41,10 +41,12 @@
           <option value="">-- pilih order --</option>
           @foreach($orders as $o)
             @php
-              $pickup = $o->pickup_time ? Carbon::parse($o->pickup_time)->format('d M Y H:i') : '-';
+              $pickupDate = $o->pickup_time ? Carbon::parse($o->pickup_time) : null;
+              $pickup = $pickupDate ? $pickupDate->format('d M Y H:i') : '-';
+              $isOverdue = $pickupDate && $pickupDate->isPast();
             @endphp
-            <option value="{{ $o->id }}" @selected(old('order_id', $order->id ?? null) == $o->id)>
-              #{{ $o->id }} — {{ $o->customer_name }} / {{ $pickup }} ({{ $o->passengers }} pax) / {{ $o->vehicle_count }} Unit
+            <option value="{{ $o->id }}" @selected(old('order_id', $order->id ?? null) == $o->id) class="{{ $isOverdue ? 'text-red-600 font-bold' : '' }}">
+              #{{ $o->id }} — {{ $o->customer_name }} / {{ $pickup }} ({{ $o->passengers }} pax) / {{ $o->vehicle_count }} Unit {{ $isOverdue ? '[OVERDUE]' : '' }}
             </option>
           @endforeach
         </select>
@@ -62,28 +64,23 @@
              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <!-- Select Driver -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Pilih Driver</label>
-                    <select :name="'assignments['+index+'][driver_id]'" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <label class="block text-sm font-medium text-gray-700">
+                        Pilih Driver
+                        <span class="text-xs text-gray-400 block font-normal" x-show="availableDrivers.length > 0">Tersedia untuk jam order ini</span>
+                    </label>
+                    <select :name="'assignments['+index+'][driver_id]'" x-model="item.driver_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                       <option value="">-- pilih driver --</option>
-                      @foreach($drivers as $d)
-                        @php
-                          $schedule = $driverSchedules[$d->id] ?? null;
-                          $totalHours = (int) ($schedule->total_hours ?? $d->monthly_work_limit ?? 200);
-                          $usedHours  = (float) ($schedule->used_hours ?? 0);
-                          $remaining  = max(0, $totalHours - $usedHours);
-                          $optionClass = $remaining <= 0 ? 'text-gray-400 bg-gray-50' : '';
-                        @endphp
-                        <option value="{{ $d->id }}" @if($remaining <= 0) disabled @endif class="{{ $optionClass }}">
-                          {{ $d->name }} ({{ $usedHours }}h used / sisa {{ $remaining }}h)
-                        </option>
-                      @endforeach
+                      <template x-for="d in availableDrivers" :key="d.id">
+                          <option :value="d.id" x-text="d.text"></option>
+                      </template>
+                      <option x-show="availableDrivers.length === 0" value="" disabled>Tidak ada driver tersedia</option>
                     </select>
                 </div>
 
                 <!-- Select Vehicle -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Pilih Kendaraan</label>
-                    <select :name="'assignments['+index+'][vehicle_id]'" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <select :name="'assignments['+index+'][vehicle_id]'" x-model="item.vehicle_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                         <option value="">-- pilih kendaraan --</option>
                         <template x-for="v in availableVehicles" :key="v.id">
                             <option :value="v.id" x-text="v.text"></option>
@@ -95,26 +92,18 @@
                 <!-- Select Guide -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Pilih Guide (opsional)</label>
-                    <select :name="'assignments['+index+'][guide_id]'" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <select :name="'assignments['+index+'][guide_id]'" x-model="item.guide_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                       <option value="">-- tidak ada --</option>
-                      @foreach($guides as $g)
-                        @php
-                          $schedule = $guideSchedules[$g->id] ?? null;
-                          $totalHours = (int) ($schedule->total_hours ?? $g->monthly_work_limit ?? 200);
-                          $usedHours  = (float) ($schedule->used_hours ?? 0);
-                          $remaining  = max(0, $totalHours - $usedHours);
-                        @endphp
-                        <option value="{{ $g->id }}" @if($remaining <= 0) disabled @endif>
-                          {{ $g->name }} ({{ $usedHours }} / {{ $totalHours }} jam)
-                        </option>
-                      @endforeach
+                      <template x-for="g in availableGuides" :key="g.id">
+                          <option :value="g.id" x-text="g.text"></option>
+                      </template>
                     </select>
                 </div>
 
                 <!-- Note -->
                 <div>
                     <label class="block text-sm font-medium text-gray-700">Catatan</label>
-                    <input type="text" :name="'assignments['+index+'][note]'" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Catatan khusus...">
+                    <input type="text" :name="'assignments['+index+'][note]'" x-model="item.note" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Catatan khusus...">
                 </div>
              </div>
          </div>
@@ -143,6 +132,8 @@ function assignmentForm() {
         // Initialize items from old input if valid, otherwise empty array
         items: @json(old('assignments', [])), 
         availableVehicles: [],
+        availableDrivers: [],
+        availableGuides: [],
 
         init() {
             // Need to ensure items is array (it might be object if indices are keys)
@@ -162,6 +153,8 @@ function assignmentForm() {
                 this.items = [];
                 this.vehicleCount = 0;
                 this.availableVehicles = [];
+                this.availableDrivers = [];
+                this.availableGuides = [];
                 return;
             }
 
@@ -170,6 +163,8 @@ function assignmentForm() {
                 .then(res => res.json())
                 .then(data => {
                     this.availableVehicles = data.vehicles || [];
+                    this.availableDrivers = data.drivers || [];
+                    this.availableGuides = data.guides || [];
                     this.vehicleCount = data.vehicle_count || 1;
                     
                     if (resetItems) {

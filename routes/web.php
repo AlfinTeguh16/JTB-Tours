@@ -58,6 +58,12 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('users', UserController::class);
     });
 
+    // Check vehicle availability types (admin + staff can create orders)
+    Route::middleware(['role:super_admin,admin,staff'])->group(function () {
+        Route::get('vehicles/check-availability-types', [VehicleController::class, 'checkAvailabilityTypes'])
+            ->name('vehicles.check-availability-types');
+    });
+
     // Products: sekarang hanya super_admin + staff (admin tidak lagi)
     Route::middleware(['role:super_admin,staff'])->group(function () {
         Route::resource('products', ProductController::class);

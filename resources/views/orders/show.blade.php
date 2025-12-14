@@ -62,7 +62,7 @@
                 <span class="text-sm text-gray-600">(Dewasa: {{ $order->adults }}, Anak: {{ $order->children }}, Bayi: {{ $order->babies }})</span>
             </dd>
             <div class="mt-1 text-sm">
-                Vehicles needed: <strong>{{ $order->vehicle_count }}</strong> ({{ $order->vehicle_type ?? 'Standard' }})
+                Vehicles needed: <strong>{{ $order->vehicle_count }}</strong>
             </div>
         </div>
 

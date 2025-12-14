@@ -25,6 +25,7 @@
 <div class="bg-white p-3 rounded shadow border-l-4 {{ match($a->status) {
     'pending' => 'border-yellow-400',
     'accepted' => 'border-green-400',
+    'in_progress' => 'border-indigo-400',
     'completed' => 'border-blue-400',
     'declined' => 'border-red-400',
     default => 'border-gray-300',
@@ -41,6 +42,12 @@
         </span>
         @if($a->workstart && in_array($a->status, ['accepted', 'completed']))
           <span class="text-xs text-gray-500 ml-2">Mulai: {{ \Carbon\Carbon::parse($a->workstart)->format('H:i') }}</span>
+        @endif
+        @if($a->status === 'in_progress' && $a->started_at)
+             <span class="text-xs font-mono bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded ml-2 live-timer" 
+                   data-start="{{ \Carbon\Carbon::parse($a->started_at)->timestamp }}">
+                   Loading...
+             </span>
         @endif
       </div>
     </div>

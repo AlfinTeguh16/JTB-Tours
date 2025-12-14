@@ -56,7 +56,12 @@ class AssignmentController extends Controller
     {
         try {
             $orderId = $request->query('order');
-            $orders = Order::whereIn('status', ['pending', 'assigned'])
+            // Filter out 'assigned' orders as per request.
+            // Assuming 'pending' is the only other valid status for creating assignment.
+            // If other statuses like 'confirmed' exist, add them here.
+            $orders = Order::where('status', '!=', 'assigned')
+                ->where('status', '!=', 'cancelled')
+                ->where('status', '!=', 'completed')
                 ->orderBy('pickup_time')
                 ->get();
     
@@ -319,16 +324,18 @@ class AssignmentController extends Controller
                 
                 // Calculate hours
                 $minutes = 0;
-                // Priority: Order Estimated Duration (from Branch) -> Actual Time Diff
-                if ($assignment->order && $assignment->order->estimated_duration_minutes > 0) {
-                    $minutes = $assignment->order->estimated_duration_minutes;
-                } elseif ($assignment->started_at) {
+                // Calculate hours based on ACTUAL time
+                $minutes = 0;
+                
+                if ($assignment->started_at) {
                     $start = \Carbon\Carbon::parse($assignment->started_at);
                     $end = \Carbon\Carbon::parse($assignment->completed_at);
                     $minutes = max(1, $end->diffInMinutes($start));
+                } elseif ($assignment->order && $assignment->order->estimated_duration_minutes > 0) {
+                     // Fallback if started_at missing (e.g. legacy or skipped in_progress)
+                    $minutes = $assignment->order->estimated_duration_minutes;
                 } else {
-                     // Fallback default
-                     $minutes = 60;
+                     $minutes = 60; // Default minimum fallback
                 }
 
                 $userId = $user->id; 
@@ -553,13 +560,85 @@ class AssignmentController extends Controller
             }
         }
 
+        // Check Driver Availability
+        $month = now()->month;
+        $year = now()->year;
+
+        $drivers = User::where('role', 'driver')
+             ->with(['workSchedules' => function($q) use($month, $year) {
+                 $q->where('month', $month)->where('year', $year);
+             }])
+             ->get()
+             ->sortBy(function($u) {
+                  return $u->workSchedules->first()?->used_hours ?? 0;
+             });
+        
+        $availableDrivers = [];
+        foreach ($drivers as $d) {
+             if (!$this->checkUserOverlap($d->id, $order)) {
+                 $schedule = $d->workSchedules->first();
+                 $used = (float)($schedule->used_hours ?? 0);
+                 $limit = (int)($schedule->total_hours ?? $d->monthly_work_limit ?? 200);
+                 $rem = max(0, $limit - $used);
+                 
+                 // Add to list if has remaining hours (optional constraint, users might want to override)
+                 // Or just show them. Let's show them.
+                 $availableDrivers[] = [
+                     'id' => $d->id,
+                     'text' => "{$d->name} ({$used}h used / sisa {$rem}h)",
+                     'remaining' => $rem
+                 ];
+             }
+        }
+
+        // Check Guide Availability
+        $guides = User::where('role', 'guide')->orderBy('name')->get();
+        $availableGuides = [];
+        foreach ($guides as $g) {
+             if (!$this->checkUserOverlap($g->id, $order)) {
+                 // Fetch schedule for info
+                 $schedule = WorkSchedule::where('user_id', $g->id)->where('month', $month)->where('year', $year)->first();
+                 $used = $schedule->used_hours ?? 0;
+                 $limit = $schedule->total_hours ?? $g->monthly_work_limit ?? 200;
+                 $availableGuides[] = [
+                     'id' => $g->id,
+                     'text' => "{$g->name} ({$used} / {$limit} jam)"
+                 ];
+             }
+        }
+
         return response()->json([
             'vehicles' => $available,
+            'drivers' => array_values($availableDrivers), // reset keys from sortBy
+            'guides' => $availableGuides,
             'vehicle_count' => $order->vehicle_count ?? 1,
             'required_capacity' => $order->passengers,
             'pickup_time' => $order->pickup_time,
             'estimated_duration' => $order->estimated_duration_minutes
         ]);
+    }
+
+    /**
+     * Check if user (driver/guide) is busy.
+     */
+    protected function checkUserOverlap($userId, Order $order)
+    {
+        $pickup = Carbon::parse($order->pickup_time);
+        $duration = $order->estimated_duration_minutes ?? 60;
+        $arrival = $pickup->copy()->addMinutes($duration);
+
+        return Assignment::where(function($q) use ($userId) {
+                $q->where('driver_id', $userId)
+                  ->orWhere('guide_id', $userId);
+            })
+            ->whereIn('assignments.status', ['pending', 'accepted', 'in_progress'])
+            ->whereHas('order', function($q) use ($pickup, $arrival) {
+                 $q->where(function($q2) use ($pickup, $arrival) {
+                     $q2->where('pickup_time', '<', $arrival)
+                        ->where(DB::raw("DATE_ADD(pickup_time, INTERVAL COALESCE(estimated_duration_minutes, 60) MINUTE)"), '>', $pickup);
+                 });
+            })
+            ->exists();
     }
 
     /**
