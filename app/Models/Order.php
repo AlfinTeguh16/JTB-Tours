@@ -60,4 +60,8 @@ class Order extends Model
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+    public function vehicles(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Vehicle::class);
+    }
 }

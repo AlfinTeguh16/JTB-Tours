@@ -136,12 +136,12 @@ class OrderController extends Controller
             'babies'                     => 'nullable|integer|min:0',
             'vehicle_count'              => 'nullable|integer|min:1',
             'note'                       => 'nullable|string|max:2000',
+            'vehicle_ids'                => 'nullable|array',
+            'vehicle_ids.*'              => 'exists:vehicles,id',
         ]);
 
         DB::beginTransaction();
         try {
-            // 🔎 Cek kapasitas product (sama seperti di update)
-            // 🔎 Cek kapasitas product (sama seperti di update)
             $product = Product::with('branches')->find($validated['product_id']);
 
             $adults  = $validated['adults']   ?? 0;
@@ -149,18 +149,15 @@ class OrderController extends Controller
             $babies  = $validated['babies']   ?? 0;
             $totalPassengers = $adults + $children + $babies;
 
-            // Capacity Check removed or made optional? 
-            // Requirement 1.5: "Jika jumlah penumpang > 4 ... otomatis hitung butuh 2 mobil"
-            // So we shouldn't block if passengers > product capacity, but rather increase vehicle count.
-            // BUT, if product is "Ticket" (e.g. Activity), maybe capacity is per unit?
-            // "Transfer Hotel" product likely refers to the *service*.
-            // Let's assume Capacity in Product is "Default car capacity".
-            // We will just calculate vehicle count here.
-            
-            // Auto-calculate Vehicle Count if missing
-            $vehicleCap = $product->capacity ?? 4; // Default fallback
-            
-            if (empty($validated['vehicle_count'])) {
+            // Handle Vehicle Selection
+            $vehicleIds = $validated['vehicle_ids'] ?? [];
+            if (!empty($vehicleIds)) {
+                // Determine vehicle count from selection
+                $validated['vehicle_count'] = count($vehicleIds);
+            } else {
+                // Auto-calculate based on capacity if no specific vehicles selected
+                // We ignore frontend vehicle_count because the manual input is hidden/removed in UI.
+                $vehicleCap = $product->capacity ?? 4;
                 $validated['vehicle_count'] = ceil($totalPassengers / max(1, $vehicleCap));
             }
 
@@ -192,12 +189,29 @@ class OrderController extends Controller
             $validated['created_by'] = Auth::check() ? Auth::id() : null;
             $validated['status']     = 'pending';
 
-            Order::create($validated);
+            $order = Order::create($validated);
+
+            // Attach Vehicles
+            if (!empty($vehicleIds)) {
+                $order->vehicles()->attach($vehicleIds);
+                // Also could update status to 'assigned' if that's the logic intended, 
+                // but usually assignment means Driver + Guide too. 
+                // For now, keep as pending until Assignment is created.
+            }
 
             DB::commit();
 
-            return redirect()->route('orders.index')->with('success', 'Order berhasil dibuat.');
-        } catch (\Throwable $e) {
+            // 🔔 Kirim Notifikasi ke Staff jika pembuat adalah Admin
+            $user = auth()->user();
+            if ($user && ($user->role === 'admin' || $user->role === 'super_admin')) {
+                 $staffUsers = \App\Models\User::where('role', 'staff')->get();
+                 if ($staffUsers->isNotEmpty()) {
+                     \Illuminate\Support\Facades\Notification::send($staffUsers, new \App\Notifications\NewOrderNotification($order, $user));
+                 }
+            }
+
+        return redirect()->route('orders.index')->with('success', 'Order created successfully.');
+    } catch (\Throwable $e) {
             DB::rollBack();
             Log::error('Order.store error: ' . $e->getMessage(), [
                 'payload' => $validated,

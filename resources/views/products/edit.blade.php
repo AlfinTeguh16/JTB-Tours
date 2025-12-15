@@ -6,7 +6,7 @@
 <div class="max-w-4xl mx-auto p-6" x-data="productEditForm()">
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold text-gray-800">Edit Product: {{ $product->name }}</h1>
-    <a href="{{ route('products.index') }}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Kembali</a>
+    <x-secondary-button :href="route('products.index')">Kembali</x-secondary-button>
   </div>
 
   <form action="{{ route('products.update', $product) }}" method="POST" class="bg-white p-6 rounded-lg shadow-md space-y-6">
@@ -31,27 +31,19 @@
         <h3 class="text-lg font-semibold border-b pb-2">Informasi Dasar</h3>
         
         <div>
-          <label class="block text-sm font-medium text-gray-700">Nama Product</label>
-          <input type="text" name="name" value="{{ old('name', $product->name) }}" required 
-                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+          <x-text-input name="name" label="Nama Product" :value="old('name', $product->name)" required />
         </div>
 
         <div>
-           <label class="block text-sm font-medium text-gray-700">Kapasitas (Default)</label>
-           <input type="number" name="capacity" value="{{ old('capacity', $product->capacity) }}" min="1" required
-                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+           <x-text-input type="number" name="capacity" label="Kapasitas (Default)" :value="old('capacity', $product->capacity)" min="1" required />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700">Deskripsi</label>
-          <textarea name="description" rows="3" 
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('description', $product->description) }}</textarea>
+          <x-textarea-input name="description" label="Deskripsi" rows="3">{{ old('description', $product->description) }}</x-textarea-input>
         </div>
 
         <div>
-           <label class="block text-sm font-medium text-gray-400">Durasi Dasar (Hour) - Legacy</label>
-           <input type="number" name="hour" value="{{ old('hour', $product->hour) }}" min="0" step="0.1"
-                  class="mt-1 block w-full rounded-md border-gray-300 bg-gray-50 shadow-sm text-gray-500">
+           <x-text-input type="number" name="hour" label="Durasi Dasar (Hour) - Legacy" :value="old('hour', $product->hour)" min="0" step="0.1" class="bg-gray-50 text-gray-500" />
         </div>
       </div>
 
@@ -121,11 +113,7 @@
             </template>
             
             <template x-for="(branch, index) in branches" :key="index">
-                <!-- Hide deleted branches from view but keep inputs with _destruct flag if simple UI -->
-                <!-- Better: remove from array and if it has ID, add to separate hidden inputs for deletion, OR use local state -->
-                <!-- To keep it simple: We will use a destruct flag approach or just ignore ID if removed from DOM? No, if we remove from DOM without flag, it won't be deleted. -->
-                <!-- We need to track deletion. -->
-                
+                <!-- Hide deleted branches from view but keep inputs with _destruct flag -->
                 <div x-show="!branch.deleted" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end bg-gray-50 p-3 rounded border">
                     <input type="hidden" :name="`branches[${index}][id]`" x-model="branch.id">
                     <input type="hidden" :name="`branches[${index}][_destruct]`" x-model="branch.deleted">
@@ -134,28 +122,28 @@
                         <label class="block text-xs font-medium text-gray-600">Nama Rute</label>
                         <input type="text" :name="`branches[${index}][name]`" x-model="branch.name" 
                                :required="!branch.deleted"
-                               class="mt-1 block w-full text-sm rounded-md border-gray-300 p-2">
+                               class="mt-1 block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2">
                     </div>
                     <div class="md:col-span-2">
                         <label class="block text-xs font-medium text-gray-600">Asal</label>
                         <input type="text" :name="`branches[${index}][origin_region]`" x-model="branch.origin"
-                               class="mt-1 block w-full text-sm rounded-md border-gray-300 p-2">
+                               class="mt-1 block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2">
                     </div>
                      <div class="md:col-span-2">
                         <label class="block text-xs font-medium text-gray-600">Tujuan</label>
                         <input type="text" :name="`branches[${index}][destination_region]`" x-model="branch.destination"
-                               class="mt-1 block w-full text-sm rounded-md border-gray-300 p-2">
+                               class="mt-1 block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2">
                     </div>
                     <div class="md:col-span-2">
                         <label class="block text-xs font-medium text-gray-600">Durasi (Menit)</label>
                         <input type="number" :name="`branches[${index}][duration_minutes]`" x-model="branch.duration" 
                                :required="!branch.deleted" min="1"
-                               class="mt-1 block w-full text-sm rounded-md border-gray-300 p-2">
+                               class="mt-1 block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2">
                     </div>
                     <div class="md:col-span-2">
                         <label class="block text-xs font-medium text-gray-600">Harga</label>
                         <input type="number" :name="`branches[${index}][price]`" x-model="branch.price"
-                               class="mt-1 block w-full text-sm rounded-md border-gray-300 p-2">
+                               class="mt-1 block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2">
                     </div>
                     <div class="md:col-span-1 text-right">
                         <button type="button" @click="markDeleted(index)" class="text-red-600 hover:text-red-800 p-2">
@@ -169,8 +157,8 @@
 
 
     <div class="pt-6 border-t flex justify-end space-x-3">
-      <a href="{{ route('products.index') }}" class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 font-medium">Batal</a>
-      <button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow font-medium">Update Product</button>
+      <x-secondary-button :href="route('products.index')">Batal</x-secondary-button>
+      <x-primary-button type="submit">Update Product</x-primary-button>
     </div>
   </form>
 </div>

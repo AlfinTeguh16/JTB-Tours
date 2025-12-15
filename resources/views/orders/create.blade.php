@@ -37,17 +37,14 @@
       <div class="space-y-4">
         <h3 class="text-lg font-semibold border-b pb-2">Data Pelanggan</h3>
         <div>
-           <label class="block text-sm font-medium text-gray-700">Nama Customer</label>
-           <input type="text" name="customer_name" value="{{ old('customer_name') }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+           <x-text-input name="customer_name" label="Nama Customer" :value="old('customer_name')" required />
         </div>
         <div class="grid grid-cols-2 gap-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700">Email</label>
-                <input type="email" name="email" value="{{ old('email') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <x-text-input type="email" name="email" label="Email" :value="old('email')" />
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700">Telepon</label>
-                <input type="text" name="phone" value="{{ old('phone') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <x-text-input name="phone" label="Telepon" :value="old('phone')" />
             </div>
         </div>
       </div>
@@ -58,26 +55,22 @@
         
         <!-- Product Selection -->
         <div>
-            <label class="block text-sm font-medium text-gray-700">Pilih Layanan / Product</label>
-            <select name="product_id" x-model="productId" @change="handleProductChange()" required
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+            <x-select-input name="product_id" label="Pilih Layanan / Product" x-model="productId" @change="handleProductChange()" required>
                 <option value="">-- Pilih Product --</option>
                 <template x-for="p in products" :key="p.id">
                     <option :value="p.id" x-text="p.name"></option>
                 </template>
-            </select>
+            </x-select-input>
         </div>
 
         <!-- Branch Selection (Dynamic) -->
         <div x-show="availableBranches.length > 0" x-transition>
-            <label class="block text-sm font-medium text-gray-700">Pilih Rute / Cabang</label>
-            <select name="product_branch_id" x-model="branchId" @change="handleBranchChange()"
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+            <x-select-input name="product_branch_id" label="Pilih Rute / Cabang" x-model="branchId" @change="handleBranchChange()">
                 <option value="">-- Pilih Rute --</option>
                 <template x-for="b in availableBranches" :key="b.id">
                     <option :value="b.id" x-text="b.name + ' (' + formatDuration(b.duration_minutes) + ')'"></option>
                 </template>
-            </select>
+            </x-select-input>
         </div>
         
         <!-- Exclusive Benefits Info -->
@@ -96,34 +89,27 @@
         <h3 class="text-lg font-semibold border-b pb-2">Waktu & Lokasi</h3>
         
         <div>
-           <label class="block text-sm font-medium text-gray-700">Waktu Penjemputan</label>
-           <input type="datetime-local" name="pickup_time" x-model="pickupTime" @change="recalcArrival" required 
-                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+           <x-text-input type="datetime-local" name="pickup_time" label="Waktu Penjemputan" x-model="pickupTime" @change="recalcArrival" required />
         </div>
         
         <div>
-           <label class="block text-sm font-medium text-gray-700">Waktu Sampai (Opsional)</label>
-           <input type="datetime-local" name="arrival_time" x-model="arrivalTime" @change="recalcDuration" 
-                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+           <x-text-input type="datetime-local" name="arrival_time" label="Waktu Sampai (Opsional)" x-model="arrivalTime" @change="recalcDuration" />
         </div>
 
         <div>
-            <label class="block text-sm font-medium text-gray-700">Estimasi Durasi (Menit)</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Estimasi Durasi (Menit)</label>
             <div class="flex items-center">
-                <input type="number" name="estimated_duration_minutes" x-model="duration" @input="recalcArrival" min="1" 
-                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                <span class="ml-2 text-sm text-gray-500" x-text="formatDuration(duration)"></span>
+                <x-text-input type="number" name="estimated_duration_minutes" x-model="duration" @input="recalcArrival" min="1" class="w-full" />
+                <span class="ml-2 text-sm text-gray-500 w-24" x-text="formatDuration(duration)"></span>
             </div>
             <p class="text-xs text-gray-500 mt-1">Otomatis dari Rute atau Waktu.</p>
         </div>
 
         <div>
-            <label class="block text-sm font-medium text-gray-700">Lokasi Jemput</label>
-            <input type="text" name="pickup_location" value="{{ old('pickup_location') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+            <x-text-input name="pickup_location" label="Lokasi Jemput" :value="old('pickup_location')" />
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700">Tujuan</label>
-            <input type="text" name="destination" value="{{ old('destination') }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+            <x-text-input name="destination" label="Tujuan" :value="old('destination')" />
         </div>
       </div>
 
@@ -133,39 +119,61 @@
         
         <div class="grid grid-cols-3 gap-3">
             <div>
-                <label class="block text-xs font-medium text-gray-700">Dewasa</label>
-                <input type="number" name="adults" x-model.number="adults" @input="updatePassengers" min="0" class="mt-1 w-full rounded-md border-gray-300 shadow-sm">
+                <x-text-input type="number" name="adults" label="Dewasa" x-model.number="adults" @input="updatePassengers" min="0" />
             </div>
             <div>
-                <label class="block text-xs font-medium text-gray-700">Anak</label>
-                <input type="number" name="children" x-model.number="children" @input="updatePassengers" min="0" class="mt-1 w-full rounded-md border-gray-300 shadow-sm">
+                <x-text-input type="number" name="children" label="Anak" x-model.number="children" @input="updatePassengers" min="0" />
             </div>
             <div>
-                <label class="block text-xs font-medium text-gray-700">Bayi</label>
-                <input type="number" name="babies" x-model.number="babies" @input="updatePassengers" min="0" class="mt-1 w-full rounded-md border-gray-300 shadow-sm">
+                <x-text-input type="number" name="babies" label="Bayi" x-model.number="babies" @input="updatePassengers" min="0" />
             </div>
         </div>
         <input type="hidden" name="passengers" x-model="totalPassengers">
 
+        <!-- Vehicle Selection -->
+        <div class="border p-4 rounded bg-gray-50">
+            <div class="flex justify-between items-center mb-2">
+                <label class="block text-sm font-medium text-gray-700">Pilih Kendaraan Available</label>
+                <button type="button" @click="fetchVehicles" class="text-xs text-blue-600 hover:text-blue-800 underline">Cek Availability</button>
+            </div>
+            
+            <div x-show="loadingVehicles" class="text-sm text-gray-500 italic">Mencari kendaraan...</div>
+            
+            <div x-show="!loadingVehicles && availableVehicles.length === 0" class="text-sm text-red-500 italic">
+                Tidak ada kendaraan available atau waktu belum diisi.
+            </div>
 
-
-        <div>
-            <label class="block text-sm font-medium text-gray-700">Jumlah Mobil Dibutuhkan</label>
-            <input type="number" name="vehicle_count" x-model="vehicleCount" min="1" 
-                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-semibold text-blue-800">
-            <p class="text-xs text-gray-500 mt-1">Dihitung otomatis (default 4 pax/mobil), silakan ubah jika perlu.</p>
+            <div x-show="!loadingVehicles && availableVehicles.length > 0" class="grid grid-cols-1 sc-sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+                <template x-for="v in availableVehicles" :key="v.id">
+                    <label class="flex items-center space-x-2 p-2 bg-white border rounded cursor-pointer hover:bg-gray-50">
+                        <input type="checkbox" name="vehicle_ids[]" :value="v.id" x-model="selectedVehicleIds" @change="updateVehicleCountFromSelection" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                        <div class="text-sm">
+                            <span class="font-semibold" x-text="v.brand + ' ' + v.type"></span>
+                            <span class="text-gray-500 text-xs" x-text="'(' + v.plate_number + ')'"></span>
+                            <div class="text-xs text-gray-400" x-text="v.capacity + ' pax'"></div>
+                        </div>
+                    </label>
+                </template>
+            </div>
+            
+            <div class="mt-2 text-right text-sm text-gray-600">
+                Total Mobil: <span x-text="selectedVehicleIds.length" class="font-bold"></span>
+            </div>
+            <!-- Hidden input to maintain compatibility if vehicle_count is still used/validated -->
+            <input type="hidden" name="vehicle_count" x-model="vehicleCount">
         </div>
 
         <div>
-            <label class="block text-sm font-medium text-gray-700">Catatan</label>
-            <textarea name="note" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">{{ old('note') }}</textarea>
+            <x-textarea-input name="note" label="Catatan" rows="2" placeholder="Catatan tambahan...">{{ old('note') }}</x-textarea-input>
         </div>
       </div>
 
     </div>
 
     <div class="flex justify-end pt-6 border-t">
-      <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-md shadow hover:bg-blue-700 font-medium">Buat Order</button>
+      <x-primary-button>
+          Buat Order
+      </x-primary-button>
     </div>
   </form>
 </div>
@@ -187,6 +195,10 @@ function orderForm(data) {
         totalPassengers: {{ old('passengers', 1) }},
         vehicleCount: data.oldVehicleCount,
 
+        availableVehicles: [],
+        selectedVehicleIds: [],
+        loadingVehicles: false,
+
         get currentProduct() {
             return this.products.find(p => p.id == this.productId) || null;
         },
@@ -204,6 +216,65 @@ function orderForm(data) {
         init() {
             this.updatePassengers();
             if (this.productId) this.handleProductChange(false); // Init without reset
+            
+            // Auto fetch if time is set
+            if (this.pickupTime && this.duration) {
+                this.fetchVehicles();
+            }
+        },
+
+        async fetchVehicles() {
+            if (!this.pickupTime || !this.duration) {
+                this.availableVehicles = [];
+                return;
+            }
+
+            this.loadingVehicles = true;
+            try {
+                // Calculate end time
+                const start = new Date(this.pickupTime);
+                const durationMs = parseInt(this.duration) * 60000;
+                const end = new Date(start.getTime() + durationMs);
+                
+                // Format for API: YYYY-MM-DD HH:mm:ss
+                const format = (d) => d.getFullYear() + "-" + 
+                    String(d.getMonth() + 1).padStart(2, '0') + "-" + 
+                    String(d.getDate()).padStart(2, '0') + " " + 
+                    String(d.getHours()).padStart(2, '0') + ":" + 
+                    String(d.getMinutes()).padStart(2, '0') + ":00";
+
+                const startStr = format(start);
+                const endStr = format(end);
+
+                // Assuming we can re-use the check-availability endpoint or creating a dedicated one.
+                // Since I created a check-availability API previously, let's use it.
+                // But wait, the previous one might have been for types only?
+                // Let's check `Route::get('api/availability/check'...)`.
+                // If not exists, I'll need to create a simple check here or use existing Controller method.
+                // To keep it simple, I will hit a new endpoint or existing one.
+                // Let's try to hit `vehicles/check-availability-list` which I just added to web.php
+                
+                const response = await fetch(`/vehicles/check-availability-list?start=${startStr}&end=${endStr}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    this.availableVehicles = data;
+                } else {
+                    console.error('Failed to fetch vehicles');
+                    this.availableVehicles = [];
+                }
+            } catch (error) {
+                console.error('Error fetching vehicles:', error);
+            } finally {
+                this.loadingVehicles = false;
+            }
+        },
+
+        updateVehicleCountFromSelection() {
+            if (this.selectedVehicleIds.length > 0) {
+                this.vehicleCount = this.selectedVehicleIds.length;
+            } else {
+                this.recalcVehicleCount();
+            }
         },
 
         handleProductChange(resetBranch = true) {
@@ -216,6 +287,7 @@ function orderForm(data) {
                 this.duration = Math.round(this.currentProduct.hour * 60);
             }
             this.recalcVehicleCount();
+            this.requestFetchVehicles();
         },
 
         handleBranchChange() {
@@ -227,7 +299,9 @@ function orderForm(data) {
 
         updatePassengers() {
             this.totalPassengers = (parseInt(this.adults)||0) + (parseInt(this.children)||0) + (parseInt(this.babies)||0);
-            this.recalcVehicleCount();
+            if (this.selectedVehicleIds.length === 0) {
+                this.recalcVehicleCount();
+            }
         },
 
         recalcVehicleCount() {
@@ -253,7 +327,14 @@ function orderForm(data) {
                 const minutes = String(end.getMinutes()).padStart(2, '0');
                 
                 this.arrivalTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+                
+                this.requestFetchVehicles();
              }
+        },
+        
+        requestFetchVehicles() {
+            // Debounce or just call
+            this.fetchVehicles();
         },
 
         recalcDuration() {
@@ -264,6 +345,7 @@ function orderForm(data) {
                     const diffMs = end - start;
                     const diffMins = Math.round(diffMs / 60000);
                     this.duration = diffMins;
+                    this.requestFetchVehicles();
                 }
             } else if (this.currentBranch) {
                 this.duration = this.currentBranch.duration_minutes;

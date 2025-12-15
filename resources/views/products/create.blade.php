@@ -6,7 +6,7 @@
 <div class="max-w-4xl mx-auto p-6" x-data="productForm()">
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold text-gray-800">Buat Product Baru</h1>
-    <a href="{{ route('products.index') }}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Kembali</a>
+    <x-secondary-button :href="route('products.index')">Kembali</x-secondary-button>
   </div>
 
   <form action="{{ route('products.store') }}" method="POST" class="bg-white p-6 rounded-lg shadow-md space-y-6">
@@ -30,29 +30,20 @@
         <h3 class="text-lg font-semibold border-b pb-2">Informasi Dasar</h3>
         
         <div>
-          <label class="block text-sm font-medium text-gray-700">Nama Product</label>
-          <input type="text" name="name" value="{{ old('name') }}" required 
-                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                 placeholder="Contoh: Transfer Hotel">
+          <x-text-input name="name" label="Nama Product" :value="old('name')" required placeholder="Contoh: Transfer Hotel" />
         </div>
 
         <div>
-           <label class="block text-sm font-medium text-gray-700">Kapasitas (Default)</label>
-           <input type="number" name="capacity" value="{{ old('capacity', 4) }}" min="1" required
-                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+           <x-text-input type="number" name="capacity" label="Kapasitas (Default)" :value="old('capacity', 4)" min="1" required />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-700">Deskripsi</label>
-          <textarea name="description" rows="3" 
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">{{ old('description') }}</textarea>
+          <x-textarea-input name="description" label="Deskripsi" rows="3">{{ old('description') }}</x-textarea-input>
         </div>
 
         {{-- Legacy Hour Field (Optional now) --}}
         <div>
-           <label class="block text-sm font-medium text-gray-400">Durasi Dasar (Hour) - <i>Opsional jika menggunakan cabang</i></label>
-           <input type="number" name="hour" value="{{ old('hour', 0) }}" min="0" step="0.1"
-                  class="mt-1 block w-full rounded-md border-gray-300 bg-gray-50 shadow-sm text-gray-500">
+           <x-text-input type="number" name="hour" label="Durasi Dasar (Hour) - Opsional jika menggunakan cabang" :value="old('hour', 0)" min="0" step="0.1" class="bg-gray-50 text-gray-500" />
         </div>
       </div>
 
@@ -61,7 +52,7 @@
         <h3 class="text-lg font-semibold border-b pb-2">Fitur Eksklusif</h3>
         
         <div class="flex items-center space-x-3">
-            <input type="checkbox" id="is_exclusive" name="is_exclusive" value="1" x-model="isExclusive"
+             <input type="checkbox" id="is_exclusive" name="is_exclusive" value="1" x-model="isExclusive"
                    class="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
             <label for="is_exclusive" class="font-medium text-gray-700">Product Eksklusif?</label>
         </div>
@@ -127,27 +118,27 @@
                     <div class="md:col-span-3">
                         <label class="block text-xs font-medium text-gray-600">Nama Rute (e.g. Kuta -> Ubud)</label>
                         <input type="text" :name="`branches[${index}][name]`" x-model="branch.name" required
-                               class="mt-1 block w-full text-sm rounded-md border-gray-300 p-2">
+                               class="mt-1 block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2">
                     </div>
                     <div class="md:col-span-2">
                         <label class="block text-xs font-medium text-gray-600">Asal (opsional)</label>
                         <input type="text" :name="`branches[${index}][origin_region]`" x-model="branch.origin"
-                               class="mt-1 block w-full text-sm rounded-md border-gray-300 p-2">
+                               class="mt-1 block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2">
                     </div>
                      <div class="md:col-span-2">
                         <label class="block text-xs font-medium text-gray-600">Tujuan (opsional)</label>
                         <input type="text" :name="`branches[${index}][destination_region]`" x-model="branch.destination"
-                               class="mt-1 block w-full text-sm rounded-md border-gray-300 p-2">
+                               class="mt-1 block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2">
                     </div>
                     <div class="md:col-span-2">
                         <label class="block text-xs font-medium text-gray-600">Durasi (Menit)</label>
                         <input type="number" :name="`branches[${index}][duration_minutes]`" x-model="branch.duration" required min="1"
-                               class="mt-1 block w-full text-sm rounded-md border-gray-300 p-2" placeholder="e.g. 150">
+                               class="mt-1 block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2" placeholder="e.g. 150">
                     </div>
                     <div class="md:col-span-2">
                         <label class="block text-xs font-medium text-gray-600">Harga (opsional)</label>
                         <input type="number" :name="`branches[${index}][price]`" x-model="branch.price"
-                               class="mt-1 block w-full text-sm rounded-md border-gray-300 p-2" placeholder="Rp">
+                               class="mt-1 block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2" placeholder="Rp">
                     </div>
                     <div class="md:col-span-1 text-right">
                         <button type="button" @click="removeBranch(index)" class="text-red-600 hover:text-red-800 p-2">
@@ -161,8 +152,8 @@
 
 
     <div class="pt-6 border-t flex justify-end space-x-3">
-      <a href="{{ route('products.index') }}" class="px-5 py-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 font-medium">Batal</a>
-      <button type="submit" class="px-5 py-2.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow font-medium">Simpan Product</button>
+      <x-secondary-button :href="route('products.index')">Batal</x-secondary-button>
+      <x-primary-button type="submit">Simpan Product</x-primary-button>
     </div>
   </form>
 </div>

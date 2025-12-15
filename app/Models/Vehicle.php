@@ -107,7 +107,7 @@ class Vehicle extends Model
         return $this->hasMany(\App\Models\Assignment::class, 'vehicle_id');
     }
     public function orders() {
-        return $this->hasMany(\App\Models\Order::class, 'vehicle_id');
+        return $this->belongsToMany(\App\Models\Order::class);
     }
     
 }

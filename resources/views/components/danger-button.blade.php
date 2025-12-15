@@ -1,5 +1,5 @@
 @props([
-    'type' => 'button',
+    'type' => 'submit',
     'href' => null,
 ])
 

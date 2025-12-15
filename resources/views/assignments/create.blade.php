@@ -36,8 +36,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       {{-- Pilih Order --}}
       <div class="col-span-1 md:col-span-2">
-        <label class="block text-sm font-medium text-gray-700">Pilih Order</label>
-        <select name="order_id" x-model="orderId" @change="fetchOrderDetails" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+        <x-select-input name="order_id" label="Pilih Order" x-model="orderId" @change="fetchOrderDetails" required>
           <option value="">-- pilih order --</option>
           @foreach($orders as $o)
             @php
@@ -49,7 +48,7 @@
               #{{ $o->id }} — {{ $o->customer_name }} / {{ $pickup }} ({{ $o->passengers }} pax) / {{ $o->vehicle_count }} Unit {{ $isOverdue ? '[OVERDUE]' : '' }}
             </option>
           @endforeach
-        </select>
+        </x-select-input>
         <p class="text-xs text-gray-500 mt-1">
             <span x-show="isLoading" class="text-blue-600">Memuat detail order...</span>
             <span x-show="!isLoading && vehicleCount > 0">Membutuhkan <span x-text="vehicleCount" class="font-bold"></span> kendaraan.</span>
@@ -64,11 +63,12 @@
              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <!-- Select Driver -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
                         Pilih Driver
                         <span class="text-xs text-gray-400 block font-normal" x-show="availableDrivers.length > 0">Tersedia untuk jam order ini</span>
                     </label>
-                    <select :name="'assignments['+index+'][driver_id]'" x-model="item.driver_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <select :name="'assignments['+index+'][driver_id]'" x-model="item.driver_id" required 
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                       <option value="">-- pilih driver --</option>
                       <template x-for="d in availableDrivers" :key="d.id">
                           <option :value="d.id" x-text="d.text"></option>
@@ -77,22 +77,37 @@
                     </select>
                 </div>
 
-                <!-- Select Vehicle -->
+                <!-- Select or Display Vehicle -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Pilih Kendaraan</label>
-                    <select :name="'assignments['+index+'][vehicle_id]'" x-model="item.vehicle_id" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                        <option value="">-- pilih kendaraan --</option>
-                        <template x-for="v in availableVehicles" :key="v.id">
-                            <option :value="v.id" x-text="v.text"></option>
-                        </template>
-                    </select>
-                    <p x-show="availableVehicles.length === 0 && !isLoading && orderId" class="text-xs text-red-500 mt-1">Tidak ada kendaraan tersedia atau belum dimuat.</p>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">
+                        Kendaraan
+                        <span x-show="hasPreassigned" class="text-xs text-green-600">(Locked)</span>
+                    </label>
+
+                    <!-- Text View (Read Only if Preassigned) -->
+                    <div x-show="hasPreassigned" class="mt-1 p-2 bg-gray-100 border rounded cursor-not-allowed">
+                        <span x-text="getVehicleText(item.vehicle_id) || 'Loading...'"></span>
+                        <input type="hidden" :name="'assignments['+index+'][vehicle_id]'" :value="item.vehicle_id" :disabled="!hasPreassigned">
+                    </div>
+
+                    <!-- Select View (Fallback for Legacy Orders) -->
+                    <div x-show="!hasPreassigned">
+                        <select :name="'assignments['+index+'][vehicle_id]'" x-model="item.vehicle_id" :required="!hasPreassigned" :disabled="hasPreassigned"
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                            <option value="">-- pilih kendaraan --</option>
+                            <template x-for="v in availableVehicles" :key="v.id">
+                                <option :value="v.id" x-text="v.text"></option>
+                            </template>
+                        </select>
+                        <p x-show="availableVehicles.length === 0 && !isLoading && orderId" class="text-xs text-red-500 mt-1">Tidak ada kendaraan tersedia.</p>
+                    </div>
                 </div>
 
                 <!-- Select Guide -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Pilih Guide (opsional)</label>
-                    <select :name="'assignments['+index+'][guide_id]'" x-model="item.guide_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Pilih Guide (opsional)</label>
+                    <select :name="'assignments['+index+'][guide_id]'" x-model="item.guide_id" 
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                       <option value="">-- tidak ada --</option>
                       <template x-for="g in availableGuides" :key="g.id">
                           <option :value="g.id" x-text="g.text"></option>
@@ -102,8 +117,9 @@
 
                 <!-- Note -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Catatan</label>
-                    <input type="text" :name="'assignments['+index+'][note]'" x-model="item.note" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" placeholder="Catatan khusus...">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Catatan</label>
+                    <input type="text" :name="'assignments['+index+'][note]'" x-model="item.note" 
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm" placeholder="Catatan khusus...">
                 </div>
              </div>
          </div>
@@ -116,8 +132,10 @@
     </div>
 
     <div class="pt-6 border-t flex justify-end space-x-3">
-      <a href="{{ route('assignments.index') }}" class="px-5 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-medium my-auto">Batal</a>
-      <button type="submit" class="px-5 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 shadow font-medium" :disabled="isLoading || !orderId">Buat Assignment</button>
+      <a href="{{ route('assignments.index') }}" class="px-5 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-medium my-auto text-sm">Batal</a>
+      <x-primary-button type="submit" ::disabled="isLoading || !orderId">
+          Buat Assignment
+      </x-primary-button>
     </div>
   </form>
 </div>
@@ -134,6 +152,12 @@ function assignmentForm() {
         availableVehicles: [],
         availableDrivers: [],
         availableGuides: [],
+        hasPreassigned: false,
+
+        getVehicleText(id) {
+            const v = this.availableVehicles.find(x => x.id == id);
+            return v ? v.text : '';
+        },
 
         init() {
             // Need to ensure items is array (it might be object if indices are keys)
@@ -169,12 +193,21 @@ function assignmentForm() {
                     
                     if (resetItems) {
                         // Create initial empty rows
-                        this.items = Array.from({ length: this.vehicleCount }, () => ({
+                        const preassigned = data.preassigned_vehicle_ids || [];
+                        this.hasPreassigned = preassigned.length > 0;
+                        
+                        this.items = Array.from({ length: this.vehicleCount }, (_, i) => ({
                             driver_id: '',
-                            vehicle_id: '',
+                            vehicle_id: preassigned[i] || '', // Auto-select if available
                             guide_id: '',
                             note: ''
                         }));
+                    } else {
+                         // Check if loaded data implies preassignment?
+                         // If reusing old input, we might not know.
+                         // But data.preassigned_vehicle_ids is truth.
+                         const preassigned = data.preassigned_vehicle_ids || [];
+                         this.hasPreassigned = preassigned.length > 0;
                     }
                     
                     this.isLoading = false;

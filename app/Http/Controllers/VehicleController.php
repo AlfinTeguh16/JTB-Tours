@@ -204,31 +204,12 @@ class VehicleController extends Controller
             $startTime = \Carbon\Carbon::parse($pickup);
             $endTime = $startTime->copy()->addMinutes($duration);
 
-            // Logic: A type is available if at least ONE vehicle of that type is available.
-            // Strict check: No overlapping assignments (pending, accepted, in_progress).
+            // Re-use Logic from checkAvailabilityList but return types
+            // However, to avoid code duplication, I should isolate the query logic.
+            // For now, I'll just check availability same way.
 
-            $vehicles = Vehicle::where('status', '!=', 'maintenance')->get();
-            $availableTypes = [];
-
-            foreach ($vehicles as $v) {
-                // Check if this vehicle has any overlapping assignment
-                $hasOverlap = $v->assignments()
-                    ->whereIn('status', ['pending', 'accepted', 'in_progress'])
-                    ->whereHas('order', function ($q) use ($startTime, $endTime) {
-                        $q->where(function ($sub) use ($startTime, $endTime) {
-                            // Overlap: Order Start < Req End AND Order End > Req Start
-                            $sub->where('pickup_time', '<', $endTime)
-                                ->whereRaw("DATE_ADD(pickup_time, INTERVAL COALESCE(estimated_duration_minutes, 60) MINUTE) > ?", [$startTime]);
-                        });
-                    })
-                    ->exists();
-
-                if (!$hasOverlap) {
-                    $availableTypes[] = $v->type;
-                }
-            }
-
-            $types = array_values(array_unique($availableTypes));
+            $availableVehicles = $this->getAvailableVehicles($startTime, $endTime);
+            $types = $availableVehicles->pluck('type')->unique()->values()->all();
             sort($types);
 
             return response()->json($types);
@@ -237,5 +218,95 @@ class VehicleController extends Controller
             Log::error('Vehicle.checkAvailabilityTypes error: ' . $e->getMessage());
             return response()->json([]);
         }
+    }
+
+    /**
+     * Get list of specific available vehicles for a time slot.
+     */
+    public function checkAvailabilityList(Request $request)
+    {
+        $startStr = $request->query('start');
+        $endStr = $request->query('end');
+
+        if (!$startStr || !$endStr) {
+             return response()->json([]);
+        }
+
+        try {
+            $startTime = \Carbon\Carbon::parse($startStr);
+            $endTime = \Carbon\Carbon::parse($endStr);
+
+            $availableVehicles = $this->getAvailableVehicles($startTime, $endTime);
+
+            return response()->json($availableVehicles->values()); // reset keys
+
+        } catch (\Throwable $e) {
+            Log::error('Vehicle.checkAvailabilityList error: ' . $e->getMessage());
+            return response()->json([]);
+        }
+    }
+
+    private function getAvailableVehicles($startTime, $endTime)
+    {
+        // 1. Get all active vehicles
+        $vehicles = Vehicle::where('status', '!=', 'maintenance')->get();
+        
+        $available = $vehicles->filter(function ($v) use ($startTime, $endTime) {
+            // Check 1: Overlapping Assignments (legacy & confirmed assignments)
+            // (assuming assignments table has workstart/workend or linked to order time)
+            // My previous check used Order time via Assignment relation.
+            
+            $hasAssignmentOverlap = $v->assignments()
+                ->whereIn('status', ['pending', 'accepted', 'in_progress'])
+                ->whereHas('order', function ($q) use ($startTime, $endTime) {
+                    $q->where(function ($sub) use ($startTime, $endTime) {
+                        // Overlap: Order Start < Req End AND Order End > Req Start
+                        // Order End = pickup + duration
+                        $sub->where('pickup_time', '<', $endTime)
+                            ->whereRaw("DATE_ADD(pickup_time, INTERVAL COALESCE(estimated_duration_minutes, 60) MINUTE) > ?", [$startTime]);
+                    });
+                })
+                ->exists();
+
+            if ($hasAssignmentOverlap) return false;
+
+            // Check 2: Overlapping Order Reservations (via order_vehicle)
+            // This is new. Check if this vehicle is attached to any Order that overlaps.
+            // But we must exclude orders that are already assigned?
+            // If an order is assigned, it has an Assignment. If we checked Assignment overlap above, do we double count?
+            // If an order is assigned to THIS vehicle, `assignment.vehicle_id` matches.
+            // If an order is assigned to ANOTHER vehicle (e.g. swap), then `order_vehicle` might still exist?
+            // Ideally, `order_vehicle` is the plan. `assignments` is the execution.
+            // If an assignment exists, it takes precedence.
+            // If NO assignment exists, check `order_vehicle`.
+            
+            // Logic: Is there any Order attached to this vehicle that overlaps AND (is pending OR assigned)?
+            // If assigned, we already checked assignments? 
+            // Actually, if an order is 'assigned', there is an assignment row. 
+            // If I rely on `order_vehicle` for 'pending' orders, that covers the gap.
+            
+            $hasOrderOverlap = $v->orders() // belongsToMany
+                ->whereIn('status', ['pending', 'assigned']) // checks pending and assigned orders
+                ->where(function ($q) use ($startTime, $endTime) {
+                     $q->where('pickup_time', '<', $endTime)
+                       ->whereRaw("DATE_ADD(pickup_time, INTERVAL COALESCE(estimated_duration_minutes, 60) MINUTE) > ?", [$startTime]);
+                })
+                ->exists();
+            
+            // Note: If an order is assigned, it satisfies $hasOrderOverlap.
+            // But does it satisfy $hasAssignmentOverlap?
+            // `$v->assignments()` checks `assignments.vehicle_id`.
+            // `$v->orders()` checks `order_vehicle.vehicle_id`.
+            // Usually they should match. If they don't (e.g. driver changed vehicle),
+            // then `assignments` is the truth for execution, but `order_vehicle` might still reserve it erroneously?
+            // For now, let's assume strict reservation: if it's in `order_vehicle`, it's busy.
+            // Unless the order is cancelled.
+            
+            if ($hasOrderOverlap) return false;
+
+            return true;
+        });
+
+        return $available;
     }
 }

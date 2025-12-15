@@ -203,7 +203,7 @@ class AssignmentController extends Controller
                 }
                 
                 // Create Assignment
-                Assignment::create([
+                $assignment = Assignment::create([
                     'order_id'     => $order->id,
                     'driver_id'    => $driver->id,
                     'guide_id'     => $guideId,
@@ -213,6 +213,14 @@ class AssignmentController extends Controller
                     'assigned_at'  => now(),
                     'note'         => $data['note'] ?? null,
                 ]);
+
+                // 🔔 Notify Driver
+                $driver->notify(new \App\Notifications\NewAssignmentNotification($assignment));
+
+                // 🔔 Notify Guide (if exists)
+                if ($guideId && isset($guide)) {
+                    $guide->notify(new \App\Notifications\NewAssignmentNotification($assignment));
+                }
             }
             
             // Check order status update
@@ -506,57 +514,90 @@ class AssignmentController extends Controller
     public function checkAvailability(Request $request)
     {
         $orderId = $request->query('order_id');
-        $order = Order::find($orderId);
+        $order = Order::with('vehicles')->find($orderId);
 
         if (!$order) {
             return response()->json([], 404);
         }
 
-        $vehicles = Vehicle::where('status', '!=', 'maintenance')
-            ->orderBy('type')
-            ->orderBy('plate_number')
-            ->get();
+        // Logic Change: If Order has specific vehicles selected via order_vehicle pivot,
+        // use ONLY those vehicles.
+        $preSelectedVehicles = $order->vehicles;
+        $vehicles = collect([]);
+
+        if ($preSelectedVehicles->count() > 0) {
+            // Use pre-selected
+             $vehicles = $preSelectedVehicles;
+             // Sort options?
+             $vehicles = $vehicles->sortBy('brand');
+        } else {
+             // Fallback to all available unique vehicles
+             $vehicles = Vehicle::where('status', '!=', 'maintenance')
+                ->orderBy('type')
+                ->orderBy('plate_number')
+                ->get();
+        }
 
         $available = [];
-        // Pre-fetch relevant assignments for performance? 
-        // Or simple N+1 query for now since vehicle count is low (usually < 50 for this context).
-        // Let's do simple query per vehicle for "next usage" on that day.
-        
+        $preassignedIds = []; // IDs to auto-fill rows
+
         $pickupTime = $order->pickup_time ? Carbon::parse($order->pickup_time) : now();
         $dateStart = $pickupTime->copy()->startOfDay();
         $dateEnd = $pickupTime->copy()->endOfDay();
         
-        // Define "After" as after the order's estimated finish? Or just after order start?
-        // "Next usage" implies after the current order IF we were to assign it.
-        // But usually it means "When is it used NEXT after NOW or after specific time?".
-        // Let's use order's pickup time as pivot.
-        
         foreach ($vehicles as $v) {
-            if (!$this->checkVehicleOverlap($v->id, $order)) {
-                
-                // Find next assignment on the same day (after this order's pickup time)
-                $nextAssignment = Assignment::where('vehicle_id', $v->id)
-                    ->whereIn('assignments.status', ['pending', 'accepted', 'in_progress'])
-                    ->whereHas('order', function($q) use ($pickupTime, $dateEnd) {
-                        $q->whereBetween('pickup_time', [$pickupTime, $dateEnd]);
-                    })
-                    ->join('orders', 'assignments.order_id', '=', 'orders.id')
-                    ->orderBy('orders.pickup_time')
-                    ->select('assignments.*') // avoid column duplication
-                    ->first();
-                
-                $statusText = ucwords(str_replace('_', ' ', $v->status));
-                $nextText = '';
-                
-                if ($nextAssignment && $nextAssignment->order) {
-                    $nextPickup = Carbon::parse($nextAssignment->order->pickup_time);
-                    $nextText = " | Next: " . $nextPickup->format('H:i');
-                }
-                
+            // If strictly pre-selected, we might skip overlap check or just warn?
+            // User specifically asked for this vehicle in Order.
+            // But if it's already used by ANOTHER assignment, we should warn or block.
+            // Let's keep the overlap check but for pre-selected, maybe we don't hide it?
+            // "assignment hanya menampilkan kendaraan yang di pilih" -> implies strict filter.
+            // I will include them but maybe mark as unavailable if overlap?
+            // If I hide them, user can't select -> block.
+            // Let's just create the list and rely on store check.
+            // But visually, show "In Use" if overlap.
+            
+            // Note: Since I just added `order_vehicle` pivot, `checkVehicleOverlap` checks assignments.
+            // It assumes if assignment exists, it overlaps.
+            // The overlap check might return true if there is an assignment.
+            
+            $isOverlapping = $this->checkVehicleOverlap($v->id, $order);
+            
+            // Find next assignment info
+            $nextAssignment = Assignment::where('vehicle_id', $v->id)
+                ->whereIn('assignments.status', ['pending', 'accepted', 'in_progress'])
+                ->whereHas('order', function($q) use ($pickupTime, $dateEnd) {
+                    $q->whereBetween('pickup_time', [$pickupTime, $dateEnd]);
+                })
+                ->join('orders', 'assignments.order_id', '=', 'orders.id')
+                ->orderBy('orders.pickup_time')
+                ->select('assignments.*') 
+                ->first();
+            
+            $statusText = ucwords(str_replace('_', ' ', $v->status));
+            if ($isOverlapping) {
+                // If pre-selected, show it but maybe mark text
+                 $statusText .= " [BUSY/OVERLAP]";
+            }
+            
+            $nextText = '';
+            if ($nextAssignment && $nextAssignment->order) {
+                $nextPickup = Carbon::parse($nextAssignment->order->pickup_time);
+                $nextText = " | Next: " . $nextPickup->format('H:i');
+            }
+            
+            // If pre-selected count > 0, include even if overlapping (user must resolve manually or pick another driver? wait vehicle is fixed).
+            // If vehicle is fixed, user is stuck. 
+            // Better to show.
+            
+            if ($preSelectedVehicles->count() > 0 || !$isOverlapping) {
                 $available[] = [
                     'id' => $v->id,
-                    'text' => "{$v->brand} {$v->type} - {$v->plate_number} ({$statusText}{$nextText})"
+                    'text' => "{$v->brand} {$v->type} - {$v->plate_number} ({$statusText}{$nextText})",
+                    'is_overlap' => $isOverlapping
                 ];
+                if ($preSelectedVehicles->count() > 0) {
+                    $preassignedIds[] = $v->id;
+                }
             }
         }
 
@@ -581,8 +622,6 @@ class AssignmentController extends Controller
                  $limit = (int)($schedule->total_hours ?? $d->monthly_work_limit ?? 200);
                  $rem = max(0, $limit - $used);
                  
-                 // Add to list if has remaining hours (optional constraint, users might want to override)
-                 // Or just show them. Let's show them.
                  $availableDrivers[] = [
                      'id' => $d->id,
                      'text' => "{$d->name} ({$used}h used / sisa {$rem}h)",
@@ -596,7 +635,6 @@ class AssignmentController extends Controller
         $availableGuides = [];
         foreach ($guides as $g) {
              if (!$this->checkUserOverlap($g->id, $order)) {
-                 // Fetch schedule for info
                  $schedule = WorkSchedule::where('user_id', $g->id)->where('month', $month)->where('year', $year)->first();
                  $used = $schedule->used_hours ?? 0;
                  $limit = $schedule->total_hours ?? $g->monthly_work_limit ?? 200;
@@ -609,12 +647,13 @@ class AssignmentController extends Controller
 
         return response()->json([
             'vehicles' => $available,
-            'drivers' => array_values($availableDrivers), // reset keys from sortBy
+            'drivers' => array_values($availableDrivers), 
             'guides' => $availableGuides,
             'vehicle_count' => $order->vehicle_count ?? 1,
             'required_capacity' => $order->passengers,
             'pickup_time' => $order->pickup_time,
-            'estimated_duration' => $order->estimated_duration_minutes
+            'estimated_duration' => $order->estimated_duration_minutes,
+            'preassigned_vehicle_ids' => $preassignedIds
         ]);
     }
 

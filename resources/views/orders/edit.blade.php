@@ -6,13 +6,14 @@
 <div class="max-w-4xl mx-auto p-6" 
      x-data="orderEditForm({ 
         products: {{ $products->toJson() }}, 
-        currentProductId: {{ $order->product_id }},
-        currentBranchId: {{ $order->product_branch_id ?? 'null' }},
-        currentVehicleCount: {{ $order->vehicle_count ?? 1 }},
-        currentDuration: {{ $order->estimated_duration_minutes ?? 0 }},
-        adults: {{ $order->adults ?? 0 }},
-        children: {{ $order->children ?? 0 }},
-        babies: {{ $order->babies ?? 0 }}
+        currentProductId: '{{ old('product_id', $order->product_id) }}',
+        currentBranchId: '{{ old('product_branch_id', $order->product_branch_id) }}',
+        currentVehicleCount: '{{ old('vehicle_count', $order->vehicle_count ?? 1) }}',
+        currentDuration: '{{ old('estimated_duration_minutes', $order->estimated_duration_minutes) }}',
+        adults: {{ old('adults', $order->adults ?? 0) }},
+        children: {{ old('children', $order->children ?? 0) }},
+        babies: {{ old('babies', $order->babies ?? 0) }},
+        totalPassengers: {{ old('passengers', $order->passengers ?? 1) }}
      })">
      
   <div class="flex items-center justify-between mb-6">
@@ -40,17 +41,14 @@
       <div class="space-y-4">
         <h3 class="text-lg font-semibold border-b pb-2">Data Pelanggan</h3>
         <div>
-           <label class="block text-sm font-medium text-gray-700">Nama Customer</label>
-           <input type="text" name="customer_name" value="{{ old('customer_name', $order->customer_name) }}" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+           <x-text-input name="customer_name" label="Nama Customer" :value="old('customer_name', $order->customer_name)" required />
         </div>
         <div class="grid grid-cols-2 gap-4">
             <div>
-                <label class="block text-sm font-medium text-gray-700">Email</label>
-                <input type="email" name="email" value="{{ old('email', $order->email) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <x-text-input type="email" name="email" label="Email" :value="old('email', $order->email)" />
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700">Telepon</label>
-                <input type="text" name="phone" value="{{ old('phone', $order->phone) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <x-text-input name="phone" label="Telepon" :value="old('phone', $order->phone)" />
             </div>
         </div>
       </div>
@@ -61,27 +59,23 @@
         
         <!-- Product Selection -->
         <div>
-            <label class="block text-sm font-medium text-gray-700">Pilih Layanan / Product</label>
-            <select name="product_id" x-model="productId" @change="handleProductChange()" required
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+            <x-select-input name="product_id" label="Pilih Layanan / Product" x-model="productId" @change="handleProductChange()" required>
                 <option value="">-- Pilih Product --</option>
                 <template x-for="p in products" :key="p.id">
                     <option :value="p.id" x-text="p.name" :selected="p.id == productId"></option>
                 </template>
-            </select>
+            </x-select-input>
         </div>
 
         <!-- Branch Selection (Dynamic) -->
         <div x-show="availableBranches.length > 0" x-transition>
-            <label class="block text-sm font-medium text-gray-700">Pilih Rute / Cabang</label>
-            <select name="product_branch_id" x-model="branchId" @change="handleBranchChange()"
-                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+             <x-select-input name="product_branch_id" label="Pilih Rute / Cabang" x-model="branchId" @change="handleBranchChange()">
                 <option value="">-- Pilih Rute --</option>
                 <template x-for="b in availableBranches" :key="b.id">
                     <option :value="b.id" x-text="b.name + ' (' + formatDuration(b.duration_minutes) + ')'"
                             :selected="b.id == branchId"></option>
                 </template>
-            </select>
+            </x-select-input>
         </div>
         
         <!-- Exclusive Benefits Info -->
@@ -100,34 +94,27 @@
         <h3 class="text-lg font-semibold border-b pb-2">Waktu & Lokasi</h3>
         
         <div>
-           <label class="block text-sm font-medium text-gray-700">Waktu Penjemputan</label>
-           <input type="datetime-local" name="pickup_time" x-model="pickupTime" @change="recalcArrival" required 
-                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+           <x-text-input type="datetime-local" name="pickup_time" label="Waktu Penjemputan" x-model="pickupTime" @change="recalcArrival" required />
         </div>
         
         <div>
-           <label class="block text-sm font-medium text-gray-700">Waktu Sampai (Opsional)</label>
-           <input type="datetime-local" name="arrival_time" x-model="arrivalTime" @change="recalcDuration" 
-                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+           <x-text-input type="datetime-local" name="arrival_time" label="Waktu Sampai (Opsional)" x-model="arrivalTime" @change="recalcDuration" />
         </div>
 
         <div>
-            <label class="block text-sm font-medium text-gray-700">Estimasi Durasi (Menit)</label>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Estimasi Durasi (Menit)</label>
             <div class="flex items-center">
-                <input type="number" name="estimated_duration_minutes" x-model="duration" @input="recalcArrival" min="1" 
-                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                <span class="ml-2 text-sm text-gray-500" x-text="formatDuration(duration)"></span>
+                <x-text-input type="number" name="estimated_duration_minutes" x-model="duration" @input="recalcArrival" min="1" class="w-full" />
+                <span class="ml-2 text-sm text-gray-500 w-24" x-text="formatDuration(duration)"></span>
             </div>
             <p class="text-xs text-gray-500 mt-1">Otomatis dari Rute atau Waktu.</p>
         </div>
 
         <div>
-            <label class="block text-sm font-medium text-gray-700">Lokasi Jemput</label>
-            <input type="text" name="pickup_location" value="{{ old('pickup_location', $order->pickup_location) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+            <x-text-input name="pickup_location" label="Lokasi Jemput" :value="old('pickup_location', $order->pickup_location)" />
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700">Tujuan</label>
-            <input type="text" name="destination" value="{{ old('destination', $order->destination) }}" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+            <x-text-input name="destination" label="Tujuan" :value="old('destination', $order->destination)" />
         </div>
       </div>
 
@@ -137,16 +124,13 @@
         
         <div class="grid grid-cols-3 gap-3">
             <div>
-                <label class="block text-xs font-medium text-gray-700">Dewasa</label>
-                <input type="number" name="adults" x-model.number="adults" @input="updatePassengers" min="0" class="mt-1 w-full rounded-md border-gray-300 shadow-sm">
+                <x-text-input type="number" name="adults" label="Dewasa" x-model.number="adults" @input="updatePassengers" min="0" />
             </div>
             <div>
-                <label class="block text-xs font-medium text-gray-700">Anak</label>
-                <input type="number" name="children" x-model.number="children" @input="updatePassengers" min="0" class="mt-1 w-full rounded-md border-gray-300 shadow-sm">
+                <x-text-input type="number" name="children" label="Anak" x-model.number="children" @input="updatePassengers" min="0" />
             </div>
             <div>
-                <label class="block text-xs font-medium text-gray-700">Bayi</label>
-                <input type="number" name="babies" x-model.number="babies" @input="updatePassengers" min="0" class="mt-1 w-full rounded-md border-gray-300 shadow-sm">
+                <x-text-input type="number" name="babies" label="Bayi" x-model.number="babies" @input="updatePassengers" min="0" />
             </div>
         </div>
         <input type="hidden" name="passengers" x-model="totalPassengers">
@@ -154,22 +138,21 @@
 
 
         <div>
-            <label class="block text-sm font-medium text-gray-700">Jumlah Mobil Dibutuhkan</label>
-            <input type="number" name="vehicle_count" x-model="vehicleCount" min="1" 
-                   class="mt-1 block w-full rounded-md border-gray-300 shadow-sm font-semibold text-blue-800">
+            <x-text-input type="number" name="vehicle_count" label="Jumlah Mobil Dibutuhkan" x-model="vehicleCount" min="1" class="font-semibold text-blue-800" />
             <p class="text-xs text-gray-500 mt-1">Dihitung otomatis (default 4 pax/mobil), silakan ubah jika perlu.</p>
         </div>
 
         <div>
-            <label class="block text-sm font-medium text-gray-700">Catatan</label>
-            <textarea name="note" rows="2" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">{{ old('note', $order->note) }}</textarea>
+            <x-textarea-input name="note" label="Catatan" rows="2" placeholder="Catatan...">{{ old('note', $order->note) }}</x-textarea-input>
         </div>
       </div>
 
     </div>
 
     <div class="flex justify-end pt-6 border-t">
-      <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-md shadow hover:bg-blue-700 font-medium">Simpan Perubahan</button>
+      <x-primary-button>
+          Simpan Perubahan
+      </x-primary-button>
     </div>
   </form>
 </div>
@@ -178,17 +161,17 @@
 function orderEditForm(data) {
     return {
         products: data.products,
+        
         productId: data.currentProductId,
         branchId: data.currentBranchId,
-        
         pickupTime: '{{ old('pickup_time', $order->pickup_time ? $order->pickup_time->format('Y-m-d\TH:i') : '') }}',
         arrivalTime: '{{ old('arrival_time', $order->arrival_time ? $order->arrival_time->format('Y-m-d\TH:i') : '') }}',
-        duration: data.currentDuration,
+        duration: data.currentDuration || 0,
         
         adults: data.adults,
         children: data.children,
         babies: data.babies,
-        totalPassengers: {{ $order->passengers ?? 1 }},
+        totalPassengers: data.totalPassengers,
         vehicleCount: data.currentVehicleCount,
 
         get currentProduct() {
@@ -207,7 +190,7 @@ function orderEditForm(data) {
 
         init() {
             this.updatePassengers();
-            // Do not reset branch on init for edit mode
+            if (this.productId) this.handleProductChange(false);
         },
 
         handleProductChange(resetBranch = true) {
@@ -216,7 +199,7 @@ function orderEditForm(data) {
                 this.duration = 0;
             }
             if (!this.duration && this.currentProduct) {
-                // Fallback
+                // Fallback to legacy hour
                 this.duration = Math.round(this.currentProduct.hour * 60);
             }
             this.recalcVehicleCount();
@@ -235,7 +218,8 @@ function orderEditForm(data) {
         },
 
         recalcVehicleCount() {
-            let cap = 4; // Default
+            // Default capability: product capacity or 4
+            let cap = 4; 
             if (this.currentProduct && this.currentProduct.capacity) {
                 cap = this.currentProduct.capacity;
             }
@@ -268,6 +252,8 @@ function orderEditForm(data) {
                     const diffMins = Math.round(diffMs / 60000);
                     this.duration = diffMins;
                 }
+            } else if (this.currentBranch) {
+                this.duration = this.currentBranch.duration_minutes;
             }
         },
         

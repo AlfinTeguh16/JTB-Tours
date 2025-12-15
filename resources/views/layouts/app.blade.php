@@ -90,6 +90,7 @@
   @endif
 
   @stack('scripts')
+  @include('partials.notification_script')
 
   <script>
     function layout(){
