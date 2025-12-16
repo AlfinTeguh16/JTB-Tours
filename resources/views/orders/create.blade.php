@@ -63,14 +63,17 @@
             </x-select-input>
         </div>
 
-        <!-- Branch Selection (Dynamic) -->
-        <div x-show="availableBranches.length > 0" x-transition>
-            <x-select-input name="product_branch_id" label="Pilih Rute / Cabang" x-model="branchId" @change="handleBranchChange()">
-                <option value="">-- Pilih Rute --</option>
+        <!-- Itinerary Display (read-only) -->
+        <div x-show="availableBranches.length > 0" x-transition class="bg-gray-50 p-3 rounded border border-gray-100">
+            <h4 class="text-sm font-semibold text-gray-700 mb-2">Rute Perjalanan (Itinerary)</h4>
+            <ul class="list-disc pl-5 text-sm text-gray-600 space-y-1">
                 <template x-for="b in availableBranches" :key="b.id">
-                    <option :value="b.id" x-text="b.name + ' (' + formatDuration(b.duration_minutes) + ')'"></option>
+                    <li>
+                         <span class="font-medium" x-text="b.name"></span>
+                         <span class="text-gray-400 text-xs" x-text="'(' + formatDuration(b.duration_minutes) + ')'"></span>
+                    </li>
                 </template>
-            </x-select-input>
+            </ul>
         </div>
         
         <!-- Exclusive Benefits Info -->
@@ -99,10 +102,10 @@
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Estimasi Durasi (Menit)</label>
             <div class="flex items-center">
-                <x-text-input type="number" name="estimated_duration_minutes" x-model="duration" @input="recalcArrival" min="1" class="w-full" />
+                <x-text-input type="number" name="estimated_duration_minutes" x-model="duration" readonly class="w-full bg-gray-100 text-gray-600" />
                 <span class="ml-2 text-sm text-gray-500 w-24" x-text="formatDuration(duration)"></span>
             </div>
-            <p class="text-xs text-gray-500 mt-1">Otomatis dari Rute atau Waktu.</p>
+            <p class="text-xs text-gray-500 mt-1">Durasi otomatis dari Product.</p>
         </div>
 
         <div>
@@ -159,6 +162,11 @@
             <div class="mt-2 text-right text-sm text-gray-600">
                 Total Mobil: <span x-text="selectedVehicleIds.length" class="font-bold"></span>
             </div>
+            
+            <div x-show="isOverCapacity" class="text-sm text-red-600 font-bold mt-2 text-right">
+                Jumlah orang melebihi kapasitas mobil yang dipilih!
+            </div>
+
             <!-- Hidden input to maintain compatibility if vehicle_count is still used/validated -->
             <input type="hidden" name="vehicle_count" x-model="vehicleCount">
         </div>
@@ -171,7 +179,7 @@
     </div>
 
     <div class="flex justify-end pt-6 border-t">
-      <x-primary-button>
+      <x-primary-button ::disabled="isOverCapacity" ::class="{ 'opacity-50 cursor-not-allowed': isOverCapacity }">
           Buat Order
       </x-primary-button>
     </div>
@@ -184,7 +192,6 @@ function orderForm(data) {
         products: data.products,
         
         productId: data.oldProductId || '',
-        branchId: data.oldBranchId || '',
         pickupTime: '{{ old('pickup_time') }}',
         arrivalTime: '{{ old('arrival_time') }}',
         duration: data.oldDuration || 0,
@@ -204,18 +211,14 @@ function orderForm(data) {
         },
 
         get availableBranches() {
+            // These illustrate itinerary stops, not selectable options
             const p = this.currentProduct;
             return p && p.branches ? p.branches : [];
         },
         
-        get currentBranch() {
-            if (!this.branchId) return null;
-            return this.availableBranches.find(b => b.id == this.branchId) || null;
-        },
-
         init() {
             this.updatePassengers();
-            if (this.productId) this.handleProductChange(false); // Init without reset
+            if (this.productId) this.handleProductChange();
             
             // Auto fetch if time is set
             if (this.pickupTime && this.duration) {
@@ -246,15 +249,7 @@ function orderForm(data) {
                 const startStr = format(start);
                 const endStr = format(end);
 
-                // Assuming we can re-use the check-availability endpoint or creating a dedicated one.
-                // Since I created a check-availability API previously, let's use it.
-                // But wait, the previous one might have been for types only?
-                // Let's check `Route::get('api/availability/check'...)`.
-                // If not exists, I'll need to create a simple check here or use existing Controller method.
-                // To keep it simple, I will hit a new endpoint or existing one.
-                // Let's try to hit `vehicles/check-availability-list` which I just added to web.php
-                
-                const response = await fetch(`/vehicles/check-availability-list?start=${startStr}&end=${endStr}`);
+                const response = await fetch(`/vehicles/check-availability-list?start=${startStr}&end=${endStr}&_t=${new Date().getTime()}`);
                 if (response.ok) {
                     const data = await response.json();
                     this.availableVehicles = data;
@@ -277,24 +272,23 @@ function orderForm(data) {
             }
         },
 
-        handleProductChange(resetBranch = true) {
-            if (resetBranch) {
-                this.branchId = '';
+        handleProductChange() {
+            if (this.currentProduct) {
+                // Determine duration from Product Hour (default)
+                // If product.hour is defined (e.g. 10 hours), convert to minutes.
+                // Assuming product.hour is in hours (float)
+               const hours = parseFloat(this.currentProduct.hour) || 0;
+               if (hours > 0) {
+                   this.duration = Math.round(hours * 60);
+               } else {
+                   this.duration = 60; // Default fallback
+               }
+            } else {
                 this.duration = 0;
-            }
-            if (!this.duration && this.currentProduct) {
-                // Fallback to legacy hour
-                this.duration = Math.round(this.currentProduct.hour * 60);
             }
             this.recalcVehicleCount();
             this.requestFetchVehicles();
-        },
-
-        handleBranchChange() {
-            if (this.currentBranch) {
-                this.duration = this.currentBranch.duration_minutes;
-                this.recalcArrival();
-            }
+            this.recalcArrival(); // Update arrival time
         },
 
         updatePassengers() {
@@ -302,6 +296,18 @@ function orderForm(data) {
             if (this.selectedVehicleIds.length === 0) {
                 this.recalcVehicleCount();
             }
+        },
+
+        get selectedCapacity() {
+            if (this.selectedVehicleIds.length === 0) return 0;
+            return this.availableVehicles
+                .filter(v => this.selectedVehicleIds.some(id => id == v.id))
+                .reduce((sum, v) => sum + v.capacity, 0);
+        },
+
+        get isOverCapacity() {
+            if (this.selectedVehicleIds.length === 0) return false;
+            return this.totalPassengers > this.selectedCapacity;
         },
 
         recalcVehicleCount() {

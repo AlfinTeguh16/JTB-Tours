@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use App\Exports\OrdersQueryExport;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Models\WorkSchedule;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 
@@ -159,18 +160,61 @@ class ReportController extends Controller
         ];
 
         // Hitung jam kerja dari assignment completed
-        $completedAssignments = $assignments->where('status', 'completed');
+        // Hitung jam kerja (Logic disamakan dengan Dashboard: Prioritas WorkSchedule)
+        $usedHours = 0;
+        $totalHours = 0;
 
-        $usedMinutes = 0;
-        foreach ($completedAssignments as $a) {
-            if ($a->workstart && $a->workend) {
-                $usedMinutes += Carbon::parse($a->workstart)
-                    ->diffInMinutes(Carbon::parse($a->workend));
+        // Loop setiap bulan dalam range
+        $curr = $start->copy()->startOfMonth(); 
+        $limit = $end->copy()->startOfMonth();
+
+        while ($curr->lte($limit)) {
+            $m = $curr->month;
+            $y = $curr->year;
+
+            // Cek WorkSchedule
+            $ws = WorkSchedule::where('user_id', $user->id)
+                ->where('year', $y)
+                ->where('month', $m)
+                ->first();
+
+            if ($ws) {
+                $usedHours += (float) $ws->used_hours;
+                $totalHours += (float) $ws->total_hours; // asumsi kolom ini ada/dipakai
+            } else {
+                // Fallback manual jika belum ada record WorkSchedule
+                $monthlyLimit = $user->monthly_work_limit ?? 200;
+                $totalHours += $monthlyLimit;
+
+                // Hitung manual assignments di bulan $m/$y
+                // Filter assignments di bulan ini
+                $monthStart = $curr->copy()->startOfMonth();
+                $monthEnd   = $curr->copy()->endOfMonth();
+                
+                $manualMinutes = 0;
+                // Kita gunakan collection $assignments yang sudah di-query (ini assignment rentang waktu dipilih)
+                // Filter lagi yang status completed DAN assigned_at di bulan ini
+                $inMonth = $assignments->filter(function($a) use ($monthStart, $monthEnd) {
+                     return $a->status === 'completed' && 
+                            $a->assigned_at >= $monthStart && 
+                            $a->assigned_at <= $monthEnd;
+                });
+
+                foreach ($inMonth as $a) {
+                    if ($a->workstart && $a->workend) {
+                        $manualMinutes += Carbon::parse($a->workstart)
+                            ->diffInMinutes(Carbon::parse($a->workend));
+                    }
+                }
+                $usedHours += round($manualMinutes / 60, 1);
             }
+
+            $curr->addMonth();
         }
 
-        $usedHours   = round($usedMinutes / 60, 1);
-        $totalHours  = $user->monthly_work_limit ?? 200;
+        // Fix logic kalau $totalHours 0 (misal user baru)
+        if ($totalHours == 0) $totalHours = 200;
+
         $usagePercent = $totalHours > 0
             ? min(100, round(($usedHours / $totalHours) * 100))
             : 0;

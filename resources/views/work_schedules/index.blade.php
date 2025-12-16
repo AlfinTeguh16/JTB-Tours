@@ -69,7 +69,7 @@
             <th class="px-4 py-2 text-left text-sm font-medium">Role</th>
             <th class="px-4 py-2 text-left text-sm font-medium">Total Hours</th>
             <th class="px-4 py-2 text-left text-sm font-medium">Used Hours</th>
-            <th class="px-4 py-2 text-right text-sm font-medium">Aksi</th>
+
           </tr>
         </thead>
 
@@ -122,13 +122,7 @@
                 @endif
               </td>
 
-              <td class="px-4 py-3 text-sm text-right">
-                @if($ws)
-                  <x-edit-button :href="route('work-schedules.edit', $ws)">Edit</x-edit-button>
-                @else
-                  <span class="text-xs text-gray-400">—</span>
-                @endif
-              </td>
+
             </tr>
           @empty
             <tr>

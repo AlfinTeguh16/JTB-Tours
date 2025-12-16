@@ -25,7 +25,7 @@ class ProductController extends Controller
                 });
             }
 
-            $products = $q->orderBy('name')->paginate(20)->withQueryString();
+            $products = $q->with('branches')->orderBy('name')->paginate(20)->withQueryString();
 
             return view('products.index', compact('products'));
         } catch (\Throwable $e) {
@@ -151,7 +151,6 @@ class ProductController extends Controller
              'branches.*.destination_region' => 'nullable|string|max:255',
              'branches.*.duration_minutes' => 'required_with:branches|integer|min:1',
              'branches.*.price' => 'nullable|numeric|min:0',
-             'branches.*._destruct' => 'nullable|boolean', // Flag to delete
         ]);
 
         DB::beginTransaction();

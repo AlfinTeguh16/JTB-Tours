@@ -5,7 +5,7 @@
 
 <div class="max-w-4xl mx-auto p-6" x-data="productEditForm()">
   <div class="flex items-center justify-between mb-6">
-    <h1 class="text-2xl font-bold text-gray-800">Edit Product: {{ $product->name }}</h1>
+    <h1 class="text-2xl font-bold text-gray-800">Edit Product {{ $product->name }}</h1>
     <x-secondary-button :href="route('products.index')">Kembali</x-secondary-button>
   </div>
 
@@ -58,18 +58,7 @@
         </div>
 
         <div x-show="isExclusive" x-transition class="space-y-3 pl-8">
-            <label class="flex items-center space-x-2">
-                <input type="checkbox" name="snack" value="1" {{ old('snack', $product->snack) ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
-                <span class="text-gray-700">Snack</span>
-            </label>
-            <label class="flex items-center space-x-2">
-                <input type="checkbox" name="water" value="1" {{ old('water', $product->water) ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
-                <span class="text-gray-700">Air Mineral</span>
-            </label>
-            <label class="flex items-center space-x-2">
-                <input type="checkbox" name="magazine" value="1" {{ old('magazine', $product->magazine) ? 'checked' : '' }} class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
-                <span class="text-gray-700">Majalah</span>
-            </label>
+             <p class="text-sm text-gray-500 italic">Silakan isi detail fasilitas eksklusif secara manual di bawah.</p>
 
             {{-- Dynamic Custom Benefits --}}
             <div class="pt-2 border-t mt-2">
@@ -140,11 +129,7 @@
                                :required="!branch.deleted" min="1"
                                class="mt-1 block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2">
                     </div>
-                    <div class="md:col-span-2">
-                        <label class="block text-xs font-medium text-gray-600">Harga</label>
-                        <input type="number" :name="`branches[${index}][price]`" x-model="branch.price"
-                               class="mt-1 block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2">
-                    </div>
+
                     <div class="md:col-span-1 text-right">
                         <button type="button" @click="markDeleted(index)" class="text-red-600 hover:text-red-800 p-2">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>

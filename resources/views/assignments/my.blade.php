@@ -129,37 +129,88 @@
     aria-modal="true"
     aria-label="Detail Assignment"
   >
-    <div class="flex items-start justify-between">
-      <h3 class="text-lg font-semibold">Detail Assignment — <span x-text="payload.id"></span></h3>
-      <button @click="close()" class="text-gray-500 hover:text-gray-800" aria-label="Tutup">✕</button>
+    <div class="flex items-start justify-between border-b pb-3 mb-4">
+      <h3 class="text-xl font-bold text-gray-900">Assignment #<span x-text="payload.id"></span></h3>
+      <button @click="close()" class="text-gray-400 hover:text-gray-600 transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
     </div>
 
-    <div class="mt-3 text-sm space-y-2">
-      <div><strong>Customer:</strong> <span x-text="payload.order && payload.order.customer ? payload.order.customer : '-'"></span></div>
-      <div><strong>Pickup:</strong> <span x-text="payload.order && payload.order.pickup ? payload.order.pickup : '-'"></span></div>
-      <div><strong>From → To:</strong> <span x-text="payload.order && payload.order.from ? payload.order.from : '-'"></span> → <span x-text="payload.order && payload.order.to ? payload.order.to : '-'"></span></div>
-      <div><strong>Product:</strong> <span x-text="payload.order && payload.order.product ? payload.order.product : '-'"></span></div>
-      <div><strong>Driver:</strong> <span x-text="payload.driver && payload.driver.name ? payload.driver.name : '-'"></span></div>
-      <div><strong>Guide:</strong> <span x-text="payload.guide && payload.guide.name ? payload.guide.name : '-'"></span></div>
-      <div><strong>Note:</strong> <span x-text="payload.note ? payload.note : '-'"></span></div>
-      <div><strong>Status:</strong> <span x-text="payload.status ? payload.status : '-'"></span></div>
+    <div class="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+      {{-- Grid Stats --}}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="bg-gray-50 p-3 rounded">
+            <span class="block text-xs font-semibold text-gray-500 uppercase">Customer</span>
+            <span class="text-lg font-medium text-gray-900" x-text="payload.order && payload.order.customer ? payload.order.customer : '-'"></span>
+          </div>
+          <div class="bg-gray-50 p-3 rounded">
+            <span class="block text-xs font-semibold text-gray-500 uppercase">Product</span>
+            <span class="text-lg font-medium text-gray-900" x-text="payload.order && payload.order.product ? payload.order.product : '-'"></span>
+          </div>
+          <div class="bg-gray-50 p-3 rounded">
+             <span class="block text-xs font-semibold text-gray-500 uppercase">Pickup Time</span>
+             <span class="text-lg font-medium text-gray-900" x-text="payload.order && payload.order.pickup ? payload.order.pickup : '-'"></span>
+          </div>
+          <div class="bg-gray-50 p-3 rounded">
+             <span class="block text-xs font-semibold text-gray-500 uppercase">Status</span>
+             <span class="text-lg font-medium uppercase" 
+                   :class="{
+                     'text-yellow-700': payload.status === 'pending',
+                     'text-green-700': payload.status === 'accepted',
+                     'text-indigo-700': payload.status === 'in_progress',
+                     'text-blue-700': payload.status === 'completed',
+                     'text-red-700': payload.status === 'declined'
+                   }" 
+                   x-text="payload.status ? payload.status : '-'"></span>
+          </div>
+      </div>
+
+      {{-- Route Info --}}
+      <div class="bg-blue-50 p-3 rounded border border-blue-100">
+         <span class="block text-xs font-semibold text-blue-600 uppercase mb-1">Rute Perjalanan</span>
+         <div class="flex items-center text-sm text-gray-900 font-medium">
+            <span x-text="payload.order && payload.order.from ? payload.order.from : '-'"></span>
+            <span class="mx-2 text-gray-400">→</span>
+            <span x-text="payload.order && payload.order.to ? payload.order.to : '-'"></span>
+         </div>
+      </div>
+
+       {{-- Team Info --}}
+       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+         <div>
+            <span class="block text-sm font-semibold text-gray-700">Driver</span>
+            <div class="mt-1 p-2 bg-gray-50 rounded text-sm text-gray-800" x-text="payload.driver && payload.driver.name ? payload.driver.name : '-'"></div>
+         </div>
+         <div>
+            <span class="block text-sm font-semibold text-gray-700">Guide</span>
+            <div class="mt-1 p-2 bg-gray-50 rounded text-sm text-gray-800" x-text="payload.guide && payload.guide.name ? payload.guide.name : '-'"></div>
+         </div>
+       </div>
+
+      {{-- Notes --}}
+      <div x-show="payload.note">
+         <span class="block text-sm font-semibold text-gray-700 mb-1">Catatan (Note)</span>
+         <div class="p-3 bg-yellow-50 rounded text-sm text-gray-800 border border-yellow-100 italic" x-text="payload.note"></div>
+      </div>
     </div>
 
-    <div class="mt-4 flex items-center justify-end space-x-2">
+    <div class="mt-6 pt-4 border-t flex flex-col sm:flex-row items-center justify-between gap-3">
+       
+      <div class="w-full sm:w-auto flex items-center gap-2">
       @auth
       <template x-if="isCurrentPerformer()">
-        <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-2 w-full">
             
           {{-- PENDING: Terima / Tolak --}}
           <template x-if="payload.status === 'pending'">
-             <div class="flex space-x-2">
-                <form x-bind:action="changeStatusUrl('accepted')" method="POST" x-ref="formAccept">
+             <div class="flex space-x-2 w-full">
+                <form x-bind:action="changeStatusUrl('accepted')" method="POST" x-ref="formAccept" class="inline-block">
                   <input type="hidden" name="_token" value="{{ csrf_token() }}">
                   <input type="hidden" name="status" value="accepted">
-                  <button type="button" @click="confirmAndSubmit($refs.formAccept, 'Terima tugas ini?')" class="px-3 py-2 bg-green-600 text-white rounded text-sm">Terima Tugas</button>
+                  <button type="button" @click="confirmAndSubmit($refs.formAccept, 'Terima tugas ini?')" class="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700 transition-colors text-sm font-medium">Terima</button>
                 </form>
                 
-                <button type="button" @click="showRejectReason = true" class="px-3 py-2 bg-red-600 text-white rounded text-sm" x-show="!showRejectReason">Tolak</button>
+                <button type="button" @click="showRejectReason = true" class="px-4 py-2 bg-red-600 text-white rounded shadow hover:bg-red-700 transition-colors text-sm font-medium" x-show="!showRejectReason">Tolak</button>
              </div>
           </template>
 
@@ -168,7 +219,7 @@
              <form x-bind:action="changeStatusUrl('in_progress')" method="POST" x-ref="formStart">
                <input type="hidden" name="_token" value="{{ csrf_token() }}">
                <input type="hidden" name="status" value="in_progress">
-               <button type="button" @click="confirmAndSubmit($refs.formStart, 'Mulai kerjakan tugas (start job)?')" class="px-3 py-2 bg-blue-600 text-white rounded text-sm">Mulai Jalan / Kerjakan</button>
+               <button type="button" @click="confirmAndSubmit($refs.formStart, 'Mulai kerjakan tugas (start job)?')" class="px-4 py-2 bg-blue-600 text-white rounded shadow hover:bg-blue-700 transition-colors text-sm font-medium">Mulai Jalan</button>
              </form>
           </template>
 
@@ -177,31 +228,29 @@
             <form x-bind:action="changeStatusUrl('completed')" method="POST" x-ref="formCompleted">
               <input type="hidden" name="_token" value="{{ csrf_token() }}">
               <input type="hidden" name="status" value="completed">
-              <button type="button" @click="confirmAndSubmit($refs.formCompleted, 'Tugas sudah selesai?')" class="px-3 py-2 bg-indigo-600 text-white rounded text-sm">Tugas Selesai</button>
+              <button type="button" @click="confirmAndSubmit($refs.formCompleted, 'Tugas sudah selesai?')" class="px-4 py-2 bg-indigo-600 text-white rounded shadow hover:bg-indigo-700 transition-colors text-sm font-medium">Selesai</button>
             </form>
           </template>
-
-           {{-- Form Tolak (Hidden by default) --}}
-           <div x-show="showRejectReason" class="w-full mt-2" style="display:none;">
-             <div class="flex flex-col space-y-2 p-3 border border-red-200 rounded bg-red-50">
-                <p class="text-xs font-bold text-red-800">Alasan Penolakan:</p>
-                <form x-bind:action="changeStatusUrl('declined')" method="POST" x-ref="formDecline">
-                  <input type="hidden" name="_token" value="{{ csrf_token() }}">
-                  <input type="hidden" name="status" value="declined">
-                  <textarea name="rejection_reason" class="w-full text-sm border-gray-300 rounded mb-2" placeholder="Tulis alasan..." required rows="2"></textarea>
-                  <div class="flex space-x-2 justify-end">
-                      <button type="button" @click="showRejectReason = false" class="px-3 py-1 bg-gray-300 text-gray-700 rounded text-xs hover:bg-gray-400">Batal</button>
-                      <button type="button" @click="confirmAndSubmit($refs.formDecline, 'Yakin menolak tugas ini?')" class="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700">Kirim Penolakan</button>
-                  </div>
-                </form>
-             </div>
-           </div>
-
         </div>
       </template>
       @endauth
+      </div>
 
-      <button @click="close()" class="px-3 py-2 bg-gray-200 rounded text-sm">Close</button>
+      {{-- Reject Form Container (Full Width if shown) --}}
+      <div x-show="showRejectReason" class="w-full absolute inset-x-0 bottom-0 bg-white p-4 border-t shadow-lg" style="display:none;" x-transition>
+             <p class="text-sm font-bold text-red-800 mb-2">Alasan Penolakan:</p>
+             <form x-bind:action="changeStatusUrl('declined')" method="POST" x-ref="formDecline">
+               <input type="hidden" name="_token" value="{{ csrf_token() }}">
+               <input type="hidden" name="status" value="declined">
+               <textarea name="rejection_reason" class="w-full text-sm border-gray-300 rounded mb-3 focus:ring-red-500 focus:border-red-500" placeholder="Tulis alasan..." required rows="2"></textarea>
+               <div class="flex space-x-2 justify-end">
+                   <button type="button" @click="showRejectReason = false" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300">Batal</button>
+                   <button type="button" @click="confirmAndSubmit($refs.formDecline, 'Yakin menolak tugas ini?')" class="px-3 py-1.5 bg-red-600 text-white rounded text-sm hover:bg-red-700">Kirim Penolakan</button>
+               </div>
+             </form>
+      </div>
+
+      <x-secondary-button type="button" @click="close()">Tutup</x-secondary-button>
     </div>
   </div>
 </div>

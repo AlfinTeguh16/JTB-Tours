@@ -253,6 +253,90 @@ class AssignmentController extends Controller
     }
 
     /**
+     * Edit Assignment (Staff/Admin)
+     */
+    public function edit(Assignment $assignment)
+    {
+        // Pastikan assignment bisa diedit (misal: belum completed?)
+        // Requirement tidak melarang, tp completed biasanya final.
+        // Kita allow saja untuk revisi data.
+
+        $order = $assignment->order;
+        
+        // Load data reference for selects
+        $month = now()->month;
+        $year  = now()->year;
+
+        // Drivers (sorted by usage like create)
+        $drivers = User::where('role', 'driver')
+            ->with(['workSchedules' => function($q) use($month, $year) {
+                $q->where('month', $month)->where('year', $year);
+            }])
+            ->get()
+            ->sortBy(function($u) {
+                return $u->workSchedules->first()?->used_hours ?? 0;
+            });
+
+        $guides = User::where('role', 'guide')->orderBy('name')->get();
+        
+        // Vehicle options (all available or currently assigned to this assignment)
+        $vehicles = Vehicle::where('status', '!=', 'maintenance')
+            ->orderBy('type')->orderBy('plate_number')->get();
+
+        return view('assignments.edit', compact('assignment', 'order', 'drivers', 'guides', 'vehicles'));
+    }
+
+    /**
+     * Update Assignment
+     */
+    public function update(Request $request, Assignment $assignment)
+    {
+        $request->validate([
+            'driver_id' => 'required|exists:users,id',
+            'guide_id'  => 'nullable|exists:users,id',
+            'vehicle_id'=> 'required|exists:vehicles,id',
+            'note'      => 'nullable|string',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            // Check Vehicle availability ONLY if Changed
+            if ($request->vehicle_id != $assignment->vehicle_id) {
+                 $vehicle = Vehicle::findOrFail($request->vehicle_id);
+                 // Check overlap. Order object is same.
+                 if ($this->checkVehicleOverlap($vehicle->id, $assignment->order)) {
+                     DB::rollBack();
+                     return back()->withInput()->with('error', "Kendaraan {$vehicle->plate_number} sedang digunakan time slot ini.");
+                 }
+                 
+                 // Release old vehicle status if it was in use?
+                 // Current logic: status 'in_use' is set when started.
+                 // If we switch vehicle mid-job, logic gets complex.
+                 // Assuming edit mostly happens when pending/accepted.
+            }
+
+            // Update assignment
+            $assignment->driver_id = $request->driver_id;
+            $assignment->guide_id = $request->guide_id;
+            $assignment->vehicle_id = $request->vehicle_id;
+            $assignment->note = $request->note;
+            $assignment->save();
+
+            // Notify new driver/guide if changed? 
+            // Simple: just save.
+
+            DB::commit();
+            return redirect()->route('assignments.index')->with('success', 'Assignment berhasil diperbarui.');
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error('Assignment.update error: '.$e->getMessage());
+            return back()->withInput()->with('error', 'Gagal update assignment.');
+        }
+    }
+
+    /**
      * Ubah status assignment oleh driver/guide
      */
     public function changeStatus(Request $request, Assignment $assignment)

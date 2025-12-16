@@ -204,7 +204,7 @@
     const ctx = canvas.getContext('2d');
 
     new Chart(ctx, {
-      type: 'line',
+      type: 'bar', // Changed from line to bar
       data: {
         labels: labels,
         datasets: [

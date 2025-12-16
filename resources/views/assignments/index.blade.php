@@ -115,11 +115,24 @@
               {{-- tombol buka modal detail --}}
               <button
                 onclick='openAssignmentModal(@json($modalPayload))'
-                class="px-2 py-1 bg-indigo-600 text-white rounded text-xs">Detail</button>
+                class="inline-flex items-center px-2 py-1 bg-indigo-600 text-white rounded text-xs">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>  
+                Detail
+              </button>
+
+              <x-edit-button :href="route('assignments.edit', $a)">Edit</x-edit-button>
 
               <form action="{{ route('assignments.destroy', $a) }}" method="POST" class="inline-block" onsubmit="return confirm('Hapus assignment?')">
                 @csrf @method('DELETE')
-                <button class="px-2 py-1 ml-2 bg-red-600 text-white rounded text-xs">Hapus</button>
+                <button class="inline-flex items-center px-2 py-1 ml-2 bg-red-600 text-white rounded text-xs">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Hapus
+                </button>
               </form>
             </td>
           </tr>
@@ -140,28 +153,80 @@
 {{-- Modal: assignment detail + action (ACCEPT / DECLINE / COMPLETE jika user adalah driver/guide terkait) --}}
 <div x-data="assignmentModal()" x-init="init()" x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
   <div class="fixed inset-0 bg-black/40" @click="close()"></div>
-  <div class="bg-white rounded shadow-lg max-w-2xl w-full p-4 z-50">
-    <div class="flex items-start justify-between">
-      <h3 class="text-lg font-medium">Detail Assignment #<span x-text="payload.id"></span></h3>
-      <button @click="close()" class="text-gray-500">✕</button>
+  <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 z-50 transform transition-all overflow-y-auto max-h-[90vh]">
+    <div class="flex items-start justify-between border-b pb-3 mb-4">
+      <h3 class="text-xl font-bold text-gray-900">Assignment #<span x-text="payload.id"></span></h3>
+      <button @click="close()" class="text-gray-400 hover:text-gray-600 transition-colors">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
     </div>
 
-    <div class="mt-3 space-y-2 text-sm">
-      <div><strong>Customer:</strong> <span x-text="payload.order.customer"></span></div>
-      <div><strong>Pickup:</strong> <span x-text="payload.order.pickup"></span></div>
-      <div><strong>From / To:</strong> <span x-text="payload.order.from"></span> → <span x-text="payload.order.to"></span></div>
-      <div><strong>Product:</strong> <span x-text="payload.order.product"></span></div>
-      <div><strong>Driver:</strong> <span x-text="payload.driver?.name ?? '-'"></span></div>
-      <div><strong>Guide:</strong> <span x-text="payload.guide?.name ?? '-'"></span></div>
-      <div><strong>Note:</strong> <span x-text="payload.note ?? '-'"></span></div>
-      <div><strong>Status:</strong> <span x-text="payload.status ?? '-'"></span></div>
+    <div class="space-y-4">
+      {{-- Customer & Product --}}
+      <div class="bg-blue-50 p-4 rounded border border-blue-100 mb-2">
+         <span class="block text-xs font-semibold text-blue-600 uppercase">Customer Info</span>
+         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+            <span class="text-lg font-bold text-blue-900" x-text="payload.order.customer"></span>
+            <span class="text-base text-blue-800 font-medium" x-text="payload.order.product"></span>
+         </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+         {{-- Trip --}}
+         <div class="bg-gray-50 p-3 rounded">
+            <span class="block text-xs font-semibold text-gray-500 uppercase">Pickup Time</span>
+            <span class="text-base font-medium text-gray-900" x-text="payload.order.pickup"></span>
+         </div>
+         <div class="bg-gray-50 p-3 rounded">
+             <span class="block text-xs font-semibold text-gray-500 uppercase">Status Assignment</span>
+             <span class="inline-block px-2 py-0.5 rounded text-sm font-medium uppercase" 
+                   :class="{
+                     'bg-yellow-100 text-yellow-800': payload.status === 'pending',
+                     'bg-green-100 text-green-800': payload.status === 'accepted',
+                     'bg-blue-50 text-blue-600 border border-blue-200': payload.status === 'in_progress',
+                     'bg-blue-100 text-blue-800': payload.status === 'completed',
+                     'bg-red-100 text-red-800': payload.status === 'declined'
+                   }"
+                   x-text="payload.status ? payload.status.replace('_',' ') : '-'"></span>
+         </div>
+      </div>
+
+      <div class="bg-gray-50 p-3 rounded border border-gray-100">
+         <span class="block text-xs font-semibold text-gray-500 uppercase mb-1">Rute Perjalanan</span>
+         <div class="flex items-center text-sm font-medium text-gray-900">
+            <span x-text="payload.order.from"></span>
+            <span class="mx-2 text-gray-400">→</span>
+            <span x-text="payload.order.to"></span>
+         </div>
+      </div>
+
+       {{-- Team Info --}}
+       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+         <div>
+            <span class="block text-sm font-semibold text-gray-700">Driver</span>
+            <div class="mt-1 p-3 bg-gray-50 rounded border border-gray-100">
+               <div class="font-bold text-gray-900" x-text="payload.driver ? payload.driver.name : '-'"></div>
+               <div class="text-xs text-gray-500" x-show="payload.driver && payload.driver.phone" x-text="payload.driver?.phone"></div>
+            </div>
+         </div>
+         <div>
+            <span class="block text-sm font-semibold text-gray-700">Guide</span>
+            <div class="mt-1 p-3 bg-gray-50 rounded border border-gray-100">
+               <div class="font-bold text-gray-900" x-text="payload.guide ? payload.guide.name : '-'"></div>
+               <div class="text-xs text-gray-500" x-show="payload.guide && payload.guide.phone" x-text="payload.guide?.phone"></div>
+            </div>
+         </div>
+       </div>
+
+       {{-- Note --}}
+       <div x-show="payload.note && payload.note !== '-'">
+         <span class="block text-sm font-semibold text-gray-700 mb-1">Catatan (Note)</span>
+         <div class="p-3 bg-yellow-50 rounded text-sm text-gray-800 border border-yellow-100 italic" x-text="payload.note"></div>
+       </div>
     </div>
 
-    <div class="mt-4 flex items-center justify-end space-x-2">
-      {{-- Admin/Staff tidak melakukan aksi driver di sini --}}
-      {{-- Admin/Staff tidak melakukan aksi driver di sini --}}
-
-      <button @click="close()" class="px-3 py-2 bg-gray-200 rounded">Close</button>
+    <div class="mt-6 pt-4 border-t flex justify-end">
+      <button @click="close()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded shadow hover:bg-gray-300 transition-colors font-medium">Tutup</button>
     </div>
   </div>
 </div>
