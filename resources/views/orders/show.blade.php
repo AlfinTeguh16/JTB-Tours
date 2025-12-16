@@ -5,7 +5,7 @@
 @section('content')
 <div class="max-w-5xl mx-auto space-y-6">
   
-  {{-- Header & Actions --}}
+  
   <div class="flex items-center justify-between">
     <h2 class="text-2xl font-bold text-gray-800">Order #{{ $order->id }}</h2>
     <div class="flex space-x-2">
@@ -14,7 +14,7 @@
     </div>
   </div>
 
-  {{-- Order Details Card --}}
+  
   <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-blue-600">
     <h3 class="text-lg font-semibold text-gray-700 mb-4 border-b pb-2">Informasi Order</h3>
     <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
@@ -95,7 +95,7 @@
     </dl>
   </div>
 
-  {{-- Assignments Section --}}
+  
   <div class="bg-white p-6 rounded-lg shadow-md">
     <div class="flex items-center justify-between mb-4 border-b pb-2">
         <h3 class="text-lg font-semibold text-gray-700">Assignments (Penugasan)</h3>

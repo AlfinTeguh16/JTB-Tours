@@ -15,26 +15,26 @@
 </head>
 <body class="bg-gray-50">
   <section class="min-h-screen flex flex-col items-center justify-center px-4 py-8">
-    <!-- Logo -->
+    
     <div class="mb-10">
       <img src="{{ asset('img/JTB_logo.png') }}" alt="JTB Tours Logo" class="h-16 sm:h-20 object-contain">
     </div>
 
-    <!-- Card Login -->
+    
     <div class="w-full max-w-md">
       <div class="bg-white rounded-xl shadow-lg overflow-hidden">
         <div class="p-6 sm:p-8">
           <h1 class="text-2xl font-bold text-center text-gray-800 mb-2">Selamat Datang</h1>
           <p class="text-gray-500 text-center text-sm mb-6">Silakan masuk ke akun Anda</p>
 
-          <!-- Flash message -->
+          
           @if(session('success'))
             <div class="bg-green-50 text-green-700 px-4 py-3 rounded-lg mb-6 text-sm">
               {{ session('success') }}
             </div>
           @endif
 
-          <!-- Form -->
+          
           <form method="POST" action="{{ route('login.post') }}">
             @csrf
 
@@ -57,7 +57,7 @@
             <div class="mb-6">
               <div class="flex justify-between items-center mb-1">
                 <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
-                <!-- Opsional: Tambahkan "Lupa Password?" di sini -->
+                
               </div>
               <input 
                 type="password" 
@@ -81,7 +81,7 @@
         </div>
       </div>
 
-      <!-- Optional footer hint -->
+      
       <p class="text-center text-gray-400 text-xs mt-4">
         &copy; {{ date('Y') }} JTB Tours. All rights reserved.
       </p>

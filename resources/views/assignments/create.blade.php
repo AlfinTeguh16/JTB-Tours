@@ -34,7 +34,7 @@
     @endif
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {{-- Pilih Order --}}
+      
       <div class="col-span-1 md:col-span-2">
         <x-select-input name="order_id" label="Pilih Order" x-model="orderId" @change="fetchOrderDetails" required>
           <option value="">-- pilih order --</option>
@@ -55,13 +55,13 @@
         </p>
       </div>
 
-      {{-- Dynamic Rows --}}
+      
       <template x-for="(item, index) in items" :key="index">
          <div class="col-span-1 md:col-span-2 border p-4 rounded-md bg-gray-50 relative">
              <div class="absolute top-2 right-2 text-xs font-bold text-gray-400" x-text="'Kendaraan #' + (index + 1)"></div>
              
              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Select Driver -->
+                
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">
                         Pilih Driver
@@ -77,20 +77,20 @@
                     </select>
                 </div>
 
-                <!-- Select or Display Vehicle -->
+                
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">
                         Kendaraan
                         <span x-show="hasPreassigned" class="text-xs text-green-600">(Locked)</span>
                     </label>
 
-                    <!-- Text View (Read Only if Preassigned) -->
+                    
                     <div x-show="hasPreassigned" class="mt-1 p-2 bg-gray-100 border rounded cursor-not-allowed">
                         <span x-text="getVehicleText(item.vehicle_id) || 'Loading...'"></span>
                         <input type="hidden" :name="'assignments['+index+'][vehicle_id]'" :value="item.vehicle_id" :disabled="!hasPreassigned">
                     </div>
 
-                    <!-- Select View (Fallback for Legacy Orders) -->
+                    
                     <div x-show="!hasPreassigned">
                         <select :name="'assignments['+index+'][vehicle_id]'" x-model="item.vehicle_id" :required="!hasPreassigned" :disabled="hasPreassigned"
                                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
@@ -103,7 +103,7 @@
                     </div>
                 </div>
 
-                <!-- Select Guide -->
+                
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Pilih Guide (opsional)</label>
                     <select :name="'assignments['+index+'][guide_id]'" x-model="item.guide_id" 
@@ -115,7 +115,7 @@
                     </select>
                 </div>
 
-                <!-- Note -->
+                
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Catatan</label>
                     <input type="text" :name="'assignments['+index+'][note]'" x-model="item.note" 

@@ -40,7 +40,7 @@
             @endif
 
             <div class="flex items-center space-x-3">
-                <!-- Notifications Bell -->
+                
                 <div x-data="notificationHandler()" x-init="startPolling()" class="relative">
                     <a href="{{ route('notifications.index') }}" class="relative p-2 text-gray-400 hover:text-gray-600">
                          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

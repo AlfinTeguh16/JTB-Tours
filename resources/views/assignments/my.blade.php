@@ -1,4 +1,4 @@
-{{-- resources/views/assignments/my.blade.php --}}
+
 @extends('layouts.app')
 
 @section('title', 'Tugas Saya')
@@ -19,7 +19,7 @@
     $history = $assignments->whereIn('status', ['completed', 'declined']);
   @endphp
 
-  {{-- === Bagian 1: Tugas Pending === --}}
+  
   <div class="mb-8">
     <div class="flex items-center gap-2 mb-3">
       <h2 class="text-lg font-medium text-gray-800">Tugas Menunggu</h2>
@@ -39,7 +39,7 @@
     @endif
   </div>
 
-  {{-- === Bagian 2: Tugas Saya Jalankan (Running) === --}}
+  
   <div class="mb-8">
     <div class="flex items-center gap-2 mb-3">
       <h2 class="text-lg font-medium text-gray-800">Tugas Berjalan</h2>
@@ -59,7 +59,7 @@
     @endif
   </div>
 
-  {{-- === Bagian 3: Tugas Diterima (Siap Dimulai) === --}}
+  
   <div class="mb-8">
     <div class="flex items-center gap-2 mb-3">
       <h2 class="text-lg font-medium text-gray-800">Tugas Diterima (Accepted)</h2>
@@ -79,7 +79,7 @@
     @endif
   </div>
 
-  {{-- === Bagian 3: Riwayat (Completed & Declined) === --}}
+  
   <div>
     <div class="flex items-center gap-2 mb-3">
       <h2 class="text-lg font-medium text-gray-800">Riwayat Tugas</h2>
@@ -95,7 +95,7 @@
         @endforeach
       </div>
 
-      {{-- Pagination hanya untuk riwayat jika > 10 --}}
+      
       @if($history->count() > 10)
         <div class="mt-4 text-center">
           <button type="button"
@@ -111,7 +111,7 @@
   </div>
 </div>
 
-{{-- Modal tetap sama — tidak diubah --}}
+
 <div
   x-data="assignmentModal()"
   x-init="init()"
@@ -137,7 +137,7 @@
     </div>
 
     <div class="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-      {{-- Grid Stats --}}
+      
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div class="bg-gray-50 p-3 rounded">
             <span class="block text-xs font-semibold text-gray-500 uppercase">Customer</span>
@@ -165,7 +165,7 @@
           </div>
       </div>
 
-      {{-- Route Info --}}
+      
       <div class="bg-blue-50 p-3 rounded border border-blue-100">
          <span class="block text-xs font-semibold text-blue-600 uppercase mb-1">Rute Perjalanan</span>
          <div class="flex items-center text-sm text-gray-900 font-medium">
@@ -175,7 +175,7 @@
          </div>
       </div>
 
-       {{-- Team Info --}}
+       
        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
          <div>
             <span class="block text-sm font-semibold text-gray-700">Driver</span>
@@ -187,7 +187,7 @@
          </div>
        </div>
 
-      {{-- Notes --}}
+      
       <div x-show="payload.note">
          <span class="block text-sm font-semibold text-gray-700 mb-1">Catatan (Note)</span>
          <div class="p-3 bg-yellow-50 rounded text-sm text-gray-800 border border-yellow-100 italic" x-text="payload.note"></div>
@@ -201,7 +201,7 @@
       <template x-if="isCurrentPerformer()">
         <div class="flex items-center space-x-2 w-full">
             
-          {{-- PENDING: Terima / Tolak --}}
+          
           <template x-if="payload.status === 'pending'">
              <div class="flex space-x-2 w-full">
                 <form x-bind:action="changeStatusUrl('accepted')" method="POST" x-ref="formAccept" class="inline-block">
@@ -214,7 +214,7 @@
              </div>
           </template>
 
-          {{-- ACCEPTED: Mulai Jalan (In Progress) --}}
+          
           <template x-if="payload.status === 'accepted'">
              <form x-bind:action="changeStatusUrl('in_progress')" method="POST" x-ref="formStart">
                <input type="hidden" name="_token" value="{{ csrf_token() }}">
@@ -223,7 +223,7 @@
              </form>
           </template>
 
-          {{-- IN PROGRESS: Selesai --}}
+          
           <template x-if="payload.status === 'in_progress'">
             <form x-bind:action="changeStatusUrl('completed')" method="POST" x-ref="formCompleted">
               <input type="hidden" name="_token" value="{{ csrf_token() }}">
@@ -236,7 +236,7 @@
       @endauth
       </div>
 
-      {{-- Reject Form Container (Full Width if shown) --}}
+      
       <div x-show="showRejectReason" class="w-full absolute inset-x-0 bottom-0 bg-white p-4 border-t shadow-lg" style="display:none;" x-transition>
              <p class="text-sm font-bold text-red-800 mb-2">Alasan Penolakan:</p>
              <form x-bind:action="changeStatusUrl('declined')" method="POST" x-ref="formDecline">
@@ -255,7 +255,7 @@
   </div>
 </div>
 
-{{-- === Extract Card ke Partial (opsional tapi direkomendasikan) === --}}
+
 @push('inline-styles')
 <style>
   .status-badge {

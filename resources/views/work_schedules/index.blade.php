@@ -18,7 +18,7 @@
 
   </div>
 
-  {{-- Filters: month / year --}}
+  
   <form method="GET" class="mb-4 grid grid-cols-1 md:grid-cols-4 gap-2 items-end">
     <div>
       <label class="block text-xs text-gray-600">Year</label>
@@ -51,7 +51,7 @@
     </div>
   </form>
 
-  {{-- Bulk update form --}}
+  
   <form action="{{ route('work-schedules.bulkUpdate') }}" method="POST">
     @csrf
     <input type="hidden" name="year" value="{{ $year }}">

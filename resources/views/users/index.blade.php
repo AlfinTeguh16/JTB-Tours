@@ -12,7 +12,7 @@
     </div>
   </div>
 
-  {{-- filters --}}
+  
   <form method="GET" class="mb-4 grid grid-cols-1 md:grid-cols-4 gap-2">
     <div>
       <label class="block text-xs text-gray-600">Role</label>
@@ -84,7 +84,7 @@
               @endif
             </td>
             <td class="px-4 py-3 text-sm text-right">
-              {{-- tombol detail: gunakan data-payload-b64 agar aman --}}
+              
               <button
                 type="button"
                 class="inline-flex items-center px-2 py-1 bg-indigo-600 text-white rounded text-xs"
@@ -123,7 +123,7 @@
   </div>
 </div>
 
-{{-- Modal user detail --}}
+
 <div x-data="userModal()" x-init="init()" x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
   <div class="fixed inset-0 bg-black/40" @click="close()"></div>
   <div class="bg-white rounded-lg shadow-xl max-w-xl w-full p-6 z-50 transform transition-all">
@@ -135,7 +135,7 @@
     </div>
 
     <div class="space-y-4">
-      {{-- Name & Role --}}
+      
       <div class="bg-blue-50 p-4 rounded border border-blue-100 mb-2">
          <span class="block text-xs font-semibold text-blue-600 uppercase">User Info</span>
          <div class="flex flex-col">
@@ -157,7 +157,7 @@
             <span class="block text-xs font-semibold text-gray-500 uppercase">Join Date</span>
             <span class="text-lg font-medium text-gray-900" x-text="payload.join_date || '-'"></span>
          </div>
-         {{-- Driver/Guide Hours --}}
+         
          <div class="bg-gray-50 p-3 rounded" x-show="payload.role === 'driver' || payload.role === 'guide'">
             <span class="block text-xs font-semibold text-gray-500 uppercase">Jam Kerja Bulan Ini</span>
             <div class="flex items-baseline space-x-1">

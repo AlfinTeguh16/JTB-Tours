@@ -73,7 +73,7 @@
               </span>
             </td>
             <td class="px-4 py-3 text-sm text-right">
-              {{-- Use raw (already escaped) JSON to call JS function safely --}}
+              
               <button onclick="openVehicleModal({!! $payloadJson !!})" class="inline-flex items-center px-2 py-1 bg-indigo-600 text-white rounded text-xs">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -107,7 +107,7 @@
   </div>
 </div>
 
-{{-- vehicle detail modal --}}
+
 <div x-data="vehicleModal()" x-init="init()" x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
   <div class="fixed inset-0 bg-black/40" @click="close()"></div>
   <div class="bg-white rounded-lg shadow-xl max-w-xl w-full p-6 z-50 transform transition-all">
@@ -119,7 +119,7 @@
     </div>
 
     <div class="space-y-4">
-      {{-- Brand & Type --}}
+      
       <div class="bg-indigo-50 p-4 rounded border border-indigo-100 mb-2">
          <span class="block text-xs font-semibold text-indigo-600 uppercase">Kendaraan</span>
          <div class="flex items-baseline space-x-2">

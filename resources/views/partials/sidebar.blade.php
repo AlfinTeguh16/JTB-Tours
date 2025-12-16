@@ -8,7 +8,7 @@
     <div class="text-xs text-gray-400 uppercase mb-2">Menu</div>
 
     <ul class="space-y-1">
-      {{-- Semua user yang login lihat Dashboard --}}
+      
       @if($isAuth)
         <li>
           <a href="{{ Route::has('dashboard') ? route('dashboard') : url('/') }}"
@@ -19,7 +19,7 @@
         </li>
       @endif
 
-      {{-- Users: hanya Super Admin --}}
+      
       @if($isAuth && $role === 'super_admin')
         <li>
           <a href="{{ Route::has('users.index') ? route('users.index') : '#' }}"
@@ -30,7 +30,7 @@
         </li>
       @endif
 
-      {{-- Orders: Super Admin, Admin, Staff --}}
+      
       @if($isAuth && in_array($role, ['super_admin','admin','staff']))
         <li>
           <a href="{{ Route::has('orders.index') ? route('orders.index') : '#' }}"
@@ -41,7 +41,7 @@
         </li>
       @endif
 
-      {{-- Assignments: Super Admin & Staff (Admin tidak lagi) --}}
+      
       @if($isAuth && in_array($role, ['super_admin','staff']))
         <li>
           <a href="{{ Route::has('assignments.index') ? route('assignments.index') : '#' }}"
@@ -52,7 +52,7 @@
         </li>
       @endif
 
-      {{-- Tugas Saya: only driver & guide --}}
+      
       @if($isAuth && in_array($role, ['driver','guide']))
         <li>
           <a href="{{ Route::has('assignments.my') ? route('assignments.my') : '#' }}"
@@ -63,7 +63,7 @@
         </li>
       @endif
 
-      {{-- Vehicles: Super Admin & Staff (Admin tidak lagi) --}}
+      
       @if($isAuth && in_array($role, ['super_admin','staff']))
         <li>
           <a href="{{ Route::has('vehicles.index') ? route('vehicles.index') : '#' }}"
@@ -74,7 +74,7 @@
         </li>
       @endif
 
-      {{-- Products: Super Admin & Staff (Admin tidak lagi) --}}
+      
       @if($isAuth && in_array($role, ['super_admin','staff']))
         <li>
           <a href="{{ Route::has('products.index') ? route('products.index') : '#' }}"
@@ -85,7 +85,7 @@
         </li>
       @endif
 
-      {{-- Work Schedules: Super Admin & Staff (Admin tidak lagi) --}}
+      
       @if($isAuth && in_array($role, ['super_admin','staff']))
         <li>
           <a href="{{ Route::has('work-schedules.index') ? route('work-schedules.index') : '#' }}"
@@ -96,7 +96,7 @@
         </li>
       @endif
 
-      {{-- Reports: semua role yang login (Admin salah satunya) --}}
+      
       @if($isAuth && in_array($role, ['super_admin','admin','staff','driver','guide']))
         <li>
           <a href="{{ Route::has('reports.index') ? route('reports.index') : '#' }}"

@@ -35,7 +35,7 @@
 
   <div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
-    {{-- Filter Bulan & Tahun --}}
+    
     <div class="bg-white rounded-lg shadow p-4">
       <form method="GET" class="flex flex-wrap items-end gap-4">
         <div>
@@ -64,7 +64,7 @@
       </form>
     </div>
 
-    {{-- Stats Cards --}}
+    
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <div class="bg-white rounded-lg shadow p-5">
         <div class="flex items-center">
@@ -123,9 +123,9 @@
       </div>
     </div>
 
-    {{-- Charts --}}
+    
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {{-- Monthly Orders & Completed Chart --}}
+      
       <div class="lg:col-span-2 bg-white rounded-lg shadow p-5">
         <div class="flex justify-between items-center mb-4">
           <h3 class="text-lg font-semibold text-gray-900">Orders & Completed — 12 Bulan Terakhir</h3>
@@ -135,7 +135,7 @@
         </div>
       </div>
 
-      {{-- Product Distribution --}}
+      
       <div class="bg-white rounded-lg shadow p-5">
         <h3 class="text-lg font-semibold text-gray-900 mb-4">Distribusi Produk ({{ \Carbon\Carbon::create($year, $month, 1)->format('F Y') }})</h3>
         <div class="h-72">
@@ -144,7 +144,7 @@
       </div>
     </div>
 
-    {{-- Quick Actions --}}
+    
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div class="bg-white rounded-lg shadow p-5">
         <div class="flex items-start">
@@ -192,7 +192,7 @@
     </div>
     </div>
 
-    {{-- Today's Orders Section --}}
+    
     <div class="bg-white rounded-lg shadow p-5 mb-6">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-gray-900">Order Hari Ini ({{ \Carbon\Carbon::today()->format('d F Y') }})</h3>
@@ -282,11 +282,11 @@
         @endif
     </div>
 
-    {{-- In Progress Tasks (Requested Feature: "In progress juga muncul di dashboard") --}}
-    {{-- Also Today's Tasks (Requested Feature: "Todays task untuk staff") --}}
+    
+    
     
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <!-- Today's Tasks & In Progress -->
+        
         <div class="bg-white rounded-lg shadow p-5">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Tugas Hari Ini & Sedang Berjalan</h3>
             @php
@@ -324,7 +324,7 @@
             @endif
         </div>
 
-        <!-- Top Drivers -->
+        
         <div class="bg-white rounded-lg shadow p-5">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Top Driver/Guide (Jam Kerja Digunakan)</h3>
             @if(!empty($topDrivers))
@@ -456,7 +456,7 @@
   });
 </script>
 
-{{-- 🔔 Notifikasi order baru: HANYA untuk STAFF --}}
+
 @if(auth()->check() && auth()->user()->role === 'staff')
 <script>
   (function () {

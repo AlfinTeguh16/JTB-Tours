@@ -28,7 +28,7 @@
 @endphp
 
 <div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
-  <!-- Header + Filter Tahun -->
+  
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
     <div>
       <h1 class="text-2xl font-bold text-gray-900">Dashboard {{ ucfirst($user->role) }}</h1>
@@ -58,14 +58,14 @@
           </option>
         @endforeach
       </select>
-      {{-- Kalau mau, bisa juga tambahkan filter bulan di sini --}}
-      {{-- <select name="month">...</select> --}}
+      
+      
     </form>
   </div>
 
-  <!-- Stats Cards -->
+  
   <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <!-- Total Tugas Bulan Ini -->
+    
     <div class="bg-white rounded-lg shadow p-5">
       <div class="flex items-center">
         <div class="p-3 bg-indigo-100 rounded-lg">
@@ -80,7 +80,7 @@
       </div>
     </div>
 
-    <!-- Jam Kerja Digunakan -->
+    
     <div class="bg-white rounded-lg shadow p-5">
       <div class="flex items-center">
         <div class="p-3 bg-green-100 rounded-lg">
@@ -107,7 +107,7 @@
       </p>
     </div>
 
-    <!-- Tugas Selesai Bulan Ini -->
+    
     <div class="bg-white rounded-lg shadow p-5">
       <div class="flex items-center">
         <div class="p-3 bg-blue-100 rounded-lg">
@@ -125,7 +125,7 @@
     </div>
   </div>
 
-  <!-- Chart: Completed per Month (setahun) -->
+  
   <div class="bg-white rounded-lg shadow p-5">
     <div class="flex items-center justify-between mb-4">
       <div>
@@ -142,7 +142,7 @@
     </div>
   </div>
 
-  <!-- Recent Assignments -->
+  
   <div class="bg-white rounded-lg shadow">
     <div class="px-5 py-4 border-b">
       <h2 class="text-lg font-semibold text-gray-900">Tugas Terbaru Bulan Ini</h2>
@@ -206,7 +206,7 @@
   </div>
 </div>
 
-{{-- Script Chart.js --}}
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   (function () {

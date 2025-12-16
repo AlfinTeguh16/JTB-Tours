@@ -1,6 +1,6 @@
-{{-- Partial: flash messages dan modal dasar (pakai Alpine.js) --}}
+
 <div class="fixed inset-0 z-40 pointer-events-none">
-  {{-- Flash messages --}}
+  
   @if(session('success') || session('error'))
     <div class="fixed top-4 right-4 z-50 pointer-events-auto">
       @if(session('success'))

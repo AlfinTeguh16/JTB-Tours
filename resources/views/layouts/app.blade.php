@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2"></script>
 
   @if(app()->environment('local'))
-    {{-- In local you may run vite dev server --}}
+    
     @vite('resources/css/app.css')
   @else
     @vite('resources/css/app.css')
@@ -29,7 +29,7 @@
   @if(auth()->check())
     <div class="min-h-screen flex">
 
-      {{-- Desktop Sidebar --}}
+      
       <aside
         class="hidden md:flex md:flex-col w-64 bg-white border-r sidebar-scroll"
         aria-hidden="false"
@@ -38,7 +38,7 @@
         @include('partials.sidebar')
       </aside>
 
-      {{-- Mobile Sidebar + overlay --}}
+      
       <div class="md:hidden" role="dialog" aria-modal="true" x-cloak>
         <div
           x-show="sidebarOpen"
@@ -67,12 +67,12 @@
         </aside>
       </div>
 
-      {{-- Main content --}}
+      
       <div class="flex-1 flex flex-col min-h-screen">
-        {{-- Topbar --}}
+        
         @include('partials.topbar')
 
-        {{-- Main content area with centered container --}}
+        
         <main class="p-4">
           <div class="max-w-7xl mx-auto w-full">
             @yield('content')
@@ -81,7 +81,7 @@
       </div>
     </div>
   @else
-    {{-- Guest layout --}}
+    
     <div class="min-h-screen flex items-center justify-center">
       <div class="w-full max-w-md p-6">
         @yield('content')

@@ -20,7 +20,7 @@
                     </span>
                     <span class="ml-2 text-gray-500">Cap: {{ $vehicle->capacity }}</span>
                 </div>
-                <!-- Additional default details -->
+                
                  <dl class="grid grid-cols-2 gap-x-6 gap-y-3 mt-4">
                     <dt class="text-sm text-gray-500">Warna</dt><dd class="font-medium">{{ $vehicle->color ?? '-' }}</dd>
                     <dt class="text-sm text-gray-500">Tahun</dt><dd class="font-medium">{{ $vehicle->year ?? '-' }}</dd>

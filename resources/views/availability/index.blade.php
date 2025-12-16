@@ -1,4 +1,4 @@
-{{-- resources/views/availability/index.blade.php --}}
+
 @extends('layouts.app')
 
 @section('content')
@@ -13,7 +13,7 @@
 
     <div class="flex items-center gap-2">
       @if(auth()->check() && in_array(auth()->user()->role, ['driver','guide']))
-        {{-- Driver/Guide self toggle --}}
+        
         <form id="self-toggle-form" action="{{ route('availability.toggle') }}" method="POST">
           @csrf
           <button type="submit" class="px-3 py-2 rounded {{ auth()->user()->status === 'online' ? 'bg-red-600 text-white' : 'bg-green-600 text-white' }}">
@@ -22,12 +22,12 @@
         </form>
       @endif
 
-      {{-- Quick filter for admins/staff --}}
+      
       <a href="{{ route('work-schedules.index') }}" class="px-3 py-2 bg-gray-100 rounded">Work Schedules</a>
     </div>
   </div>
 
-  {{-- Admin/Staff filters --}}
+  
   @if(auth()->check() && in_array(auth()->user()->role, ['super_admin','admin','staff']))
     <form method="GET" class="mb-4 grid grid-cols-1 md:grid-cols-4 gap-2">
       <div>
@@ -60,7 +60,7 @@
     </form>
   @endif
 
-  {{-- List --}}
+  
   <div class="bg-white rounded shadow overflow-hidden">
     <table class="min-w-full divide-y divide-gray-200">
       <thead class="bg-gray-50">
@@ -103,9 +103,9 @@
               </div>
             </td>
             <td class="px-4 py-3 text-sm text-right">
-              {{-- Actions differ by current user role --}}
+              
               @if(auth()->check() && in_array(auth()->user()->role, ['super_admin','admin','staff']))
-                {{-- Force change form --}}
+                
                 <form action="{{ route('availability.force', $u) }}" method="POST" class="inline-flex items-center" onsubmit="return confirm('Set status untuk {{ $u->name }}?')">
                   @csrf
                   <select name="status" class="px-2 py-1 rounded border-gray-200 text-sm">
@@ -115,10 +115,10 @@
                   <button type="submit" class="ml-2 px-2 py-1 bg-blue-600 text-white rounded text-sm">Set</button>
                 </form>
 
-                {{-- Quick view --}}
+                
                 <button @click="showDetail({{ $u->toJson() }})" class="ml-2 px-2 py-1 bg-gray-200 rounded text-sm">Detail</button>
               @elseif(auth()->check() && auth()->user()->id === $u->id)
-                {{-- Self: show status & simple toggle (driver/guide) --}}
+                
                 <form action="{{ route('availability.toggle') }}" method="POST" class="inline-block">
                   @csrf
                   <button type="submit" class="px-3 py-1 rounded text-sm {{ $u->status === 'online' ? 'bg-red-600 text-white' : 'bg-green-600 text-white' }}">
@@ -146,7 +146,7 @@
   </div>
 </div>
 
-{{-- Detail modal (Alpine) --}}
+
 <div x-data="availabilityModal()" x-cloak x-show="open" class="fixed inset-0 z-50 flex items-center justify-center">
   <div class="fixed inset-0 bg-black/40" @click="close()"></div>
   <div class="bg-white rounded shadow-lg max-w-lg w-full p-4 z-50">

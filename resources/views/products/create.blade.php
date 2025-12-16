@@ -12,7 +12,7 @@
   <form action="{{ route('products.store') }}" method="POST" class="bg-white p-6 rounded-lg shadow-md space-y-6">
     @csrf
 
-    {{-- Validation Errors --}}
+    
     @if($errors->any())
       <div class="p-4 bg-red-50 border-l-4 border-red-500 text-red-700">
         <ul class="list-disc pl-5">
@@ -25,7 +25,7 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       
-      {{-- Basic Info --}}
+      
       <div class="space-y-4">
         <h3 class="text-lg font-semibold border-b pb-2">Informasi Dasar</h3>
         
@@ -41,13 +41,13 @@
           <x-textarea-input name="description" label="Deskripsi" rows="3">{{ old('description') }}</x-textarea-input>
         </div>
 
-        {{-- Legacy Hour Field (Optional now) --}}
+        
         <div>
            <x-text-input type="number" name="hour" label="Durasi Dasar (Hour) - Opsional jika menggunakan cabang" :value="old('hour', 0)" min="0" step="0.1" class="bg-gray-50 text-gray-500" />
         </div>
       </div>
 
-      {{-- Exclusive Features --}}
+      
       <div class="space-y-4 bg-gray-50 p-4 rounded-lg">
         <h3 class="text-lg font-semibold border-b pb-2">Fitur Eksklusif</h3>
         
@@ -61,7 +61,7 @@
             <p class="text-sm text-gray-500 italic">Silakan isi detail fasilitas eksklusif secara manual di bawah.</p>
 
 
-            {{-- Dynamic Custom Benefits --}}
+            
             <div class="pt-2 border-t mt-2">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Benefit Tambahan (Opsional)</label>
                 <div class="space-y-2">
@@ -85,7 +85,7 @@
       </div>
     </div>
 
-    {{-- Branches Section --}}
+    
     <div class="mt-8">
         <div class="flex items-center justify-between border-b pb-2 mb-4">
             <h3 class="text-lg font-semibold">Cabang / Rute Product</h3>

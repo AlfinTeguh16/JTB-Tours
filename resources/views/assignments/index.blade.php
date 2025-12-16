@@ -11,7 +11,7 @@
     </div>
   </div>
 
-  {{-- Filter singkat --}}
+  
   <form method="GET" class="mb-4 grid grid-cols-1 md:grid-cols-4 gap-2">
     <div>
       <label class="block text-sm">Status</label>
@@ -41,7 +41,7 @@
     </div>
   </form>
 
-  {{-- Table --}}
+  
   <div class="bg-white rounded shadow overflow-hidden">
     <table class="min-w-full divide-y divide-gray-200">
       <thead class="bg-gray-50">
@@ -56,7 +56,7 @@
       </thead>
       <tbody class="divide-y divide-gray-100">
         @forelse($assignments as $a)
-          {{-- prepare payload safely for JS --}}
+          
           @php
             $modalPayload = [
               'id' => $a->id,
@@ -83,7 +83,7 @@
           @endphp
 
           <tr>
-            {{-- nomor urut rapi per halaman --}}
+            
             <td class="px-4 py-3 text-sm">
               {{ $assignments->firstItem() ? $assignments->firstItem() + $loop->index : $loop->iteration }}
             </td>
@@ -112,7 +112,7 @@
               <span class="px-2 py-1 rounded text-xs {{ $badge }}">{{ ucfirst($a->status ?? '—') }}</span>
             </td>
             <td class="px-4 py-3 text-sm text-right">
-              {{-- tombol buka modal detail --}}
+              
               <button
                 onclick='openAssignmentModal(@json($modalPayload))'
                 class="inline-flex items-center px-2 py-1 bg-indigo-600 text-white rounded text-xs">
@@ -150,7 +150,7 @@
   </div>
 </div>
 
-{{-- Modal: assignment detail + action (ACCEPT / DECLINE / COMPLETE jika user adalah driver/guide terkait) --}}
+
 <div x-data="assignmentModal()" x-init="init()" x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
   <div class="fixed inset-0 bg-black/40" @click="close()"></div>
   <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 z-50 transform transition-all overflow-y-auto max-h-[90vh]">
@@ -162,7 +162,7 @@
     </div>
 
     <div class="space-y-4">
-      {{-- Customer & Product --}}
+      
       <div class="bg-blue-50 p-4 rounded border border-blue-100 mb-2">
          <span class="block text-xs font-semibold text-blue-600 uppercase">Customer Info</span>
          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
@@ -172,7 +172,7 @@
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-         {{-- Trip --}}
+         
          <div class="bg-gray-50 p-3 rounded">
             <span class="block text-xs font-semibold text-gray-500 uppercase">Pickup Time</span>
             <span class="text-base font-medium text-gray-900" x-text="payload.order.pickup"></span>
@@ -200,7 +200,7 @@
          </div>
       </div>
 
-       {{-- Team Info --}}
+       
        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
          <div>
             <span class="block text-sm font-semibold text-gray-700">Driver</span>
@@ -218,7 +218,7 @@
          </div>
        </div>
 
-       {{-- Note --}}
+       
        <div x-show="payload.note && payload.note !== '-'">
          <span class="block text-sm font-semibold text-gray-700 mb-1">Catatan (Note)</span>
          <div class="p-3 bg-yellow-50 rounded text-sm text-gray-800 border border-yellow-100 italic" x-text="payload.note"></div>

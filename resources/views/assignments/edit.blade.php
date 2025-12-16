@@ -12,7 +12,7 @@
     @include('partials.flash-and-modal')
 
     <div class="bg-white rounded shadow overflow-hidden p-6">
-        {{-- Order Info (Context) --}}
+        
         <div class="bg-blue-50 p-4 rounded border border-blue-100 mb-6">
             <h3 class="text-sm font-bold text-blue-800 uppercase mb-2">Info Order</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -40,7 +40,7 @@
             @method('PUT')
 
             <div class="grid grid-cols-1 gap-6">
-                {{-- Driver --}}
+                
                 <div>
                     <label for="driver_id" class="block font-medium text-sm text-gray-700">Driver</label>
                     <select id="driver_id" name="driver_id" class="block w-full mt-1 border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
@@ -56,7 +56,7 @@
                     @enderror
                 </div>
 
-                {{-- Guide --}}
+                
                 <div>
                     <label for="guide_id" class="block font-medium text-sm text-gray-700">Guide (Optional)</label>
                     <select id="guide_id" name="guide_id" class="block w-full mt-1 border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
@@ -72,7 +72,7 @@
                     @enderror
                 </div>
 
-                {{-- Vehicle --}}
+                
                 <div>
                     <label for="vehicle_id" class="block font-medium text-sm text-gray-700">Vehicle</label>
                     <select id="vehicle_id" name="vehicle_id" class="block w-full mt-1 border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
@@ -88,7 +88,7 @@
                     @enderror
                 </div>
 
-                {{-- Note --}}
+                
                 <div>
                     <label for="note" class="block font-medium text-sm text-gray-700">Catatan (Note)</label>
                     <textarea id="note" name="note" class="block w-full mt-1 border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" rows="3">{{ old('note', $assignment->note) }}</textarea>

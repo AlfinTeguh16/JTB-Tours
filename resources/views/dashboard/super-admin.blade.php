@@ -16,13 +16,13 @@
 @endphp
 
 <div class="max-w-7xl mx-auto px-4 py-6">
-  {{-- Header --}}
+  
   <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
     <h1 class="text-2xl font-semibold">Admin Dashboard (Super Admin)</h1>
     <div class="text-sm text-gray-600">Welcome, {{ auth()->user()->name }}</div>
   </div>
 
-  {{-- Stats --}}
+  
   <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-6">
     <div class="bg-white rounded shadow p-4">
       <div class="text-sm text-gray-500">Orders ({{ \Carbon\Carbon::create($year, $month, 1)->format('M Y') }})</div>
@@ -45,7 +45,7 @@
     </div>
   </div>
 
-  {{-- Quick actions --}}
+  
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
     <div class="bg-white rounded shadow p-4">
       <h4 class="font-semibold">Manage Users</h4>
@@ -73,9 +73,9 @@
     </div>
   </div>
 
-  {{-- Charts Section --}}
+  
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-    {{-- Bar chart --}}
+    
     <div class="lg:col-span-2 bg-white rounded shadow p-4">
       <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
         <h3 class="font-semibold">Orders — 12 months</h3>
@@ -93,7 +93,7 @@
       </div>
     </div>
 
-    {{-- Pie chart --}}
+    
     <div class="bg-white rounded shadow p-4">
       <h3 class="font-semibold mb-2">Product Distribution ({{ \Carbon\Carbon::create($year, $month, 1)->format('M Y') }})</h3>
       <div class="h-60">
@@ -102,7 +102,7 @@
     </div>
   </div>
 
-  {{-- Top Drivers --}}
+  
   <div class="bg-white rounded shadow p-4">
     <h4 class="font-semibold mb-3">Top Drivers (by used hours)</h4>
     @if(!empty($topDrivers))
@@ -120,7 +120,7 @@
   </div>
 </div>
 
-{{-- Scripts --}}
+
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>

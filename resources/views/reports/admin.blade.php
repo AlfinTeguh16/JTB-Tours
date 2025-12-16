@@ -24,14 +24,14 @@
     </div>
   </div>
 
-  {{-- Flash --}}
+  
   @if(session('success')) <div class="bg-green-100 text-green-800 p-3 rounded mb-4">{{ session('success') }}</div> @endif
   @if(session('error')) <div class="bg-red-100 text-red-800 p-3 rounded mb-4">{{ session('error') }}</div> @endif
 
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <div class="bg-white p-4 rounded shadow">
       <h3 class="text-lg font-medium mb-2">Jumlah Order per Bulan ({{ $year }})</h3>
-      {{-- container dengan tinggi tetap supaya chart tidak memperbesar dirinya --}}
+      
       <div class="w-full h-56">
         <canvas id="ordersChart" class="w-full h-full"></canvas>
       </div>
@@ -58,7 +58,7 @@
   </div>
 </div>
 
-{{-- Chart.js CDN --}}
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>

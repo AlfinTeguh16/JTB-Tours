@@ -4,7 +4,7 @@
 @include('partials.flash-and-modal')
 
 <div class="max-w-7xl mx-auto p-4">
-  {{-- Header --}}
+  
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-2">
     <h1 class="text-2xl font-semibold">Orders</h1>
     <div class="flex flex-wrap gap-2">
@@ -17,7 +17,7 @@
     </div>
   </div>
 
-  {{-- Filter --}}
+  
   <form method="GET" class="mb-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
     <div>
       <label class="block text-xs text-gray-600">Cari</label>
@@ -64,7 +64,7 @@
     </div>
   </form>
 
-  {{-- Table --}}
+  
   <div class="bg-white rounded shadow overflow-x-auto">
     <table class="min-w-full divide-y divide-gray-200 text-sm">
       <thead class="bg-gray-50 text-gray-700 text-xs uppercase tracking-wider">
@@ -82,7 +82,7 @@
       <tbody class="divide-y divide-gray-100">
         @forelse($orders as $o)
           <tr class="hover:bg-gray-50">
-            {{-- nomor urut yang rapi: pertama pada halaman + loop index --}}
+            
             <td class="px-4 py-3">{{ $orders->firstItem() ? $orders->firstItem() + $loop->index : $loop->iteration }}</td>
 
             <td class="px-4 py-3">
@@ -163,7 +163,7 @@
   </div>
 </div>
 
-{{-- Modal --}}
+
 <div x-data="orderModal()" x-init="init()" x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
   <div class="fixed inset-0 bg-black/40" @click="close()"></div>
   <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 z-50 transform transition-all overflow-y-auto max-h-[90vh]">
@@ -175,7 +175,7 @@
     </div>
 
     <div class="space-y-4">
-       {{-- Customer & Product --}}
+       
        <div class="bg-blue-50 p-4 rounded border border-blue-100 mb-2">
          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
@@ -192,7 +192,7 @@
          </div>
        </div>
 
-       {{-- Guests & Status --}}
+       
        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-gray-50 p-3 rounded">
           <div>
             <span class="block text-xs font-semibold text-gray-500 uppercase">Adults</span>
@@ -218,7 +218,7 @@
           </div>
        </div>
 
-       {{-- Trip Info --}}
+       
        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div class="bg-gray-50 p-3 rounded">
              <span class="block text-xs font-semibold text-gray-500 uppercase">Pickup Time</span>
@@ -239,7 +239,7 @@
          </div>
        </div>
 
-       {{-- Note --}}
+       
        <div x-show="payload.note && payload.note !== '-'">
          <span class="block text-sm font-semibold text-gray-700 mb-1">Catatan (Note)</span>
          <div class="p-3 bg-yellow-50 rounded text-sm text-gray-800 border border-yellow-100 italic" x-text="payload.note"></div>

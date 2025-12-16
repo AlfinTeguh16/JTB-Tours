@@ -1,4 +1,4 @@
-{{-- resources/views/dashboard.blade.php --}}
+
 @extends('layouts.app')
 
 @section('title', 'Dashboard')
@@ -35,7 +35,7 @@
   </div>
 
   <div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
-    {{-- Quick stats --}}
+    
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
       <div class="bg-white rounded shadow p-4">
         <div class="text-sm text-gray-500">Orders ({{ \Carbon\Carbon::create($year, $month, 1)->format('M Y') }})</div>
@@ -58,7 +58,7 @@
       </div>
     </div>
 
-    {{-- Charts --}}
+    
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <div class="lg:col-span-2 bg-white rounded shadow p-4">
         <h3 class="font-semibold mb-2">Orders — 12 months</h3>
@@ -75,7 +75,7 @@
       </div>
     </div>
 
-    {{-- Role panels --}}
+    
     @php $role = Auth::user()->role; @endphp
 
     @if($role === 'super_admin')
@@ -155,7 +155,7 @@
       </div>
     @endif
 
-    {{-- Top drivers --}}
+    
     <div class="bg-white rounded shadow p-4">
       <h4 class="font-semibold mb-3">Top drivers (by used hours)</h4>
       @if(!empty($topDrivers))

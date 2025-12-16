@@ -14,14 +14,14 @@
     Kelola informasi akun dan data pribadi Anda.
   </p>
 
-  {{-- Flash message --}}
+  
   @if(session('success'))
     <div class="mb-4 rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">
       {{ session('success') }}
     </div>
   @endif
 
-  {{-- Error message --}}
+  
   @if($errors->any())
     <div class="mb-4 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
       <div class="font-semibold mb-1">Terjadi kesalahan:</div>
@@ -43,7 +43,7 @@
       @csrf
       @method('PUT')
 
-      {{-- Foto Profil --}}
+      
       <div class="flex items-start gap-4">
         <div>
           @if($user->profile_photo)
@@ -75,7 +75,7 @@
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {{-- Nama --}}
+        
         <div>
           <label for="name" class="block text-sm font-medium text-gray-700">Nama Lengkap</label>
           <input
@@ -89,7 +89,7 @@
           >
         </div>
 
-        {{-- Phone --}}
+        
         <div>
           <label for="phone" class="block text-sm font-medium text-gray-700">No. Telepon</label>
           <input
@@ -105,7 +105,7 @@
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {{-- Email --}}
+        
         <div>
           <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
           <input
@@ -119,7 +119,7 @@
           >
         </div>
 
-        {{-- Role (readonly info) --}}
+        
         <div>
           <label class="block text-sm font-medium text-gray-700">Role</label>
           <input
@@ -131,7 +131,7 @@
         </div>
       </div>
 
-      {{-- Password --}}
+      
       <div class="border-t border-gray-100 pt-4">
         <h2 class="text-sm font-semibold text-gray-800 mb-1">Ubah Password</h2>
         <p class="text-xs text-gray-500 mb-3">
@@ -166,7 +166,7 @@
         </div>
       </div>
 
-      {{-- Tombol --}}
+      
       <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
         <a
           href="{{ url()->previous() }}"

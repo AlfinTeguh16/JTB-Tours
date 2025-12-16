@@ -37,7 +37,7 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       
-      <!-- Customer Info -->
+      
       <div class="space-y-4">
         <h3 class="text-lg font-semibold border-b pb-2">Data Pelanggan</h3>
         <div>
@@ -53,11 +53,11 @@
         </div>
       </div>
 
-      <!-- Service Info -->
+      
       <div class="space-y-4">
         <h3 class="text-lg font-semibold border-b pb-2">Layanan & Rute</h3>
         
-        <!-- Product Selection -->
+        
         <div>
             <x-select-input name="product_id" label="Pilih Layanan / Product" x-model="productId" @change="handleProductChange()" required>
                 <option value="">-- Pilih Product --</option>
@@ -67,7 +67,7 @@
             </x-select-input>
         </div>
 
-        <!-- Itinerary Display (read-only) -->
+        
         <div x-show="availableBranches.length > 0" x-transition class="bg-gray-50 p-3 rounded border border-gray-100">
             <h4 class="text-sm font-semibold text-gray-700 mb-2">Rute Perjalanan (Itinerary)</h4>
             <ul class="list-disc pl-5 text-sm text-gray-600 space-y-1">
@@ -80,7 +80,7 @@
             </ul>
         </div>
         
-        <!-- Exclusive Benefits Info -->
+        
         <div x-show="currentProduct && currentProduct.is_exclusive" x-transition class="bg-indigo-50 p-3 rounded border border-indigo-100 text-sm text-indigo-800">
             <strong>✨ Fasilitas Eksklusif:</strong>
             <ul class="list-disc pl-5 mt-1">
@@ -91,7 +91,7 @@
         </div>
       </div>
 
-      <!-- Time & Location -->
+      
       <div class="space-y-4">
         <h3 class="text-lg font-semibold border-b pb-2">Waktu & Lokasi</h3>
         
@@ -120,7 +120,7 @@
         </div>
       </div>
 
-      <!-- Passengers & Vehicle -->
+      
       <div class="space-y-4">
         <h3 class="text-lg font-semibold border-b pb-2">Penumpang & Kendaraan</h3>
         
@@ -139,7 +139,7 @@
 
 
 
-        <!-- Vehicle Selection -->
+        
         <div class="border p-4 rounded bg-gray-50">
             <div class="flex justify-between items-center mb-2">
                 <label class="block text-sm font-medium text-gray-700">Pilih Kendaraan Available</label>
@@ -173,7 +173,7 @@
                 Jumlah orang melebihi kapasitas mobil yang dipilih!
             </div>
 
-            <!-- Hidden input to maintain compatibility -->
+            
             <input type="hidden" name="vehicle_count" x-model="vehicleCount">
         </div>
 

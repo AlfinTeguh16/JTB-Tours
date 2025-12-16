@@ -13,7 +13,7 @@
     @csrf
     @method('PUT')
 
-    {{-- Validation Errors --}}
+    
     @if($errors->any())
       <div class="p-4 bg-red-50 border-l-4 border-red-500 text-red-700">
         <ul class="list-disc pl-5">
@@ -26,7 +26,7 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       
-      {{-- Basic Info --}}
+      
       <div class="space-y-4">
         <h3 class="text-lg font-semibold border-b pb-2">Informasi Dasar</h3>
         
@@ -47,7 +47,7 @@
         </div>
       </div>
 
-      {{-- Exclusive Features --}}
+      
       <div class="space-y-4 bg-gray-50 p-4 rounded-lg">
         <h3 class="text-lg font-semibold border-b pb-2">Fitur Eksklusif</h3>
         
@@ -60,7 +60,7 @@
         <div x-show="isExclusive" x-transition class="space-y-3 pl-8">
              <p class="text-sm text-gray-500 italic">Silakan isi detail fasilitas eksklusif secara manual di bawah.</p>
 
-            {{-- Dynamic Custom Benefits --}}
+            
             <div class="pt-2 border-t mt-2">
                 <label class="block text-sm font-medium text-gray-700 mb-2">Benefit Tambahan (Opsional)</label>
                 <div class="space-y-2">
@@ -84,7 +84,7 @@
       </div>
     </div>
 
-    {{-- Branches Section --}}
+    
     <div class="mt-8">
         <div class="flex items-center justify-between border-b pb-2 mb-4">
             <h3 class="text-lg font-semibold">Cabang / Rute Product</h3>
@@ -102,7 +102,7 @@
             </template>
             
             <template x-for="(branch, index) in branches" :key="index">
-                <!-- Hide deleted branches from view but keep inputs with _destruct flag -->
+                
                 <div x-show="!branch.deleted" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end bg-gray-50 p-3 rounded border">
                     <input type="hidden" :name="`branches[${index}][id]`" x-model="branch.id">
                     <input type="hidden" :name="`branches[${index}][_destruct]`" x-model="branch.deleted">

@@ -86,7 +86,7 @@
   </div>
 </div>
 
-{{-- Modal product detail --}}
+
 <div x-data="productModal()" x-init="init()" x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
   <div class="fixed inset-0 bg-black/40" @click="close()"></div>
   <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 z-50 transform transition-all">
@@ -114,7 +114,7 @@
         <div class="p-3 bg-gray-50 rounded text-sm text-gray-600 whitespace-pre-line" x-text="payload.description || '-'"></div>
       </div>
 
-      {{-- Exclusive Benefits --}}
+      
       <template x-if="payload.is_exclusive && payload.custom_exclusive_benefits && payload.custom_exclusive_benefits.length > 0">
         <div>
            <span class="block text-sm font-semibold text-gray-700 mb-2">Benefit Eksklusif</span>
@@ -126,7 +126,7 @@
         </div>
       </template>
 
-      {{-- Branches --}}
+      
       <template x-if="payload.branches && payload.branches.length > 0">
         <div>
            <span class="block text-sm font-semibold text-gray-700 mb-2">Cabang / Rute (Branches)</span>
